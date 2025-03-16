@@ -1,0 +1,908 @@
+%% ------------- MUST RUN SECTION FOR ALL FURTHER ANALYSIS ------------- %%
+base_dir='G:\WMAZE_Data\Data_Behaviour\Data_CognitiveBattery\WaterMaze\Mia_Proj';
+processed_dir=fullfile(base_dir,'StrategyProcessed');
+fig_dir=fullfile(base_dir,'Figures');
+
+%Load data from Excel files
+data1 = readtable(fullfile(base_dir,'MWM_results.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
+data2 = readtable(fullfile(base_dir,'AllMorrisWaterMazeData_Spatial.csv'));  % From Matlab Analysis contains Test_No, Cohort, Platform_CIPL
+% Analysis Parameters that are constant - mostly colours for groups
+grpList = ["Young","Old"];
+clrMap  = {[0 0.6 0],[0.5 0 0.5]}; % green, purple
+
+%------- Initialize Vectors for CIPL Scores and Strategy Probs -------%
+
+N = height(data1);
+platformScores = zeros(N,1);
+
+% Loop over each row in Strategy Data to find corresponding CIPL from
+% second data set
+for i = 1:N
+    % Get Track ID which has cohort number and trial no.
+    tID = data1.Track_ID{i};
+    % Use regexp to extract numeric parts: cohort and test number
+    tokens = regexp(tID, 'Coh(\d+)_test(\d+)', 'tokens');
+    if ~isempty(tokens)
+        token = tokens{1};
+        cohortNum = str2double(token{1});
+        testNum = str2double(token{2});
+        % Find the matching row in data2 using cohort and test numbers
+        idx = find(data2.Cohort == cohortNum & data2.Test == testNum, 1);
+        if ~isempty(idx)
+            platformScores(i) = data2.Platform_CIPL(idx);
+        else
+            platformScores(i) = NaN;
+        end
+    else
+        platformScores(i) = NaN;
+    end
+end
+
+% Define the strategy column names (adjust names if needed)
+strategyNames = {'thigmotaxis','circling','random_path','scanning',...
+    'chaining','directed_search','corrected_search','direct_path','perseverance'};
+nStrategies = numel(strategyNames);
+
+strategy_titles={'Thigmotaxis','Circling','Random Path','Scanning',...
+    'Chaining','Directed Search','Corrected Search','Direct Path','Perseverance'};
+
+
+%% CHECK THIS PORTION right after 
+% Remove rows where no matching Platform_CIPL was found -- CHECK
+ % validIdx = ~isnan(platformScores);
+ % data1 = data1(validIdx,:);
+ % platformScores = platformScores(validIdx);
+
+
+%% 1) CIPL-Strategy  Plots- All trials
+polyOrder = 3;  % CHANGE if needed based on fit - 1,-linear, 2- quadratic and 3- cubic.
+
+for s = 1:nStrategies
+    
+    % Extract the probability vector for the current strategy
+    stratProb = data1.(strategyNames{s});
+    
+    % Separate indices for young and old groups based on the Age column
+    isYoung = strcmp(data1.Age, 'young');
+    isOld = strcmp(data1.Age, 'old');
+
+    % Get data for each
+    x_young = platformScores(isYoung);
+    y_young = stratProb(isYoung);
+    n_young = numel(x_young);
+    
+    % Data for old
+    x_old = platformScores(isOld);
+    y_old = stratProb(isOld);
+    n_old = numel(x_old);
+    
+    f=figure;
+    hold on;
+
+    % Scatter plot (only scatter handles used in the legend)
+    scatter(x_young, y_young, 20, clrMap{1}, 'filled','MarkerFaceAlpha',0.5);
+    scatter(x_old, y_old, 20, clrMap{2}, 'filled','MarkerFaceAlpha',0.5);
+
+    % NEW FIT
+   % Fit a polynomial of specified order
+    p_young = polyfit(x_young, y_young, polyOrder);
+    % Generate fitted curve
+    xFit_y = linspace(min(x_young), max(x_young), 100);
+    yFit_y = polyval(p_young, xFit_y);
+    h1 =plot(xFit_y, yFit_y, 'Color', clrMap{1}, 'LineWidth', 2,'DisplayName','YOUNG');
+    
+    % Compute R^2 for the young fit
+    yHat_young = polyval(p_young, x_young);
+    SSE_y = sum((y_young - yHat_young).^2);                 
+    SST_y = sum((y_young - mean(y_young)).^2);            
+    R2_young = 1 - SSE_y / SST_y;                          
+    r_young = sqrt(max(R2_young, 0));  % effective correlation from r^2
+
+    %Old fit
+    p_old = polyfit(x_old, y_old, polyOrder);
+    % Generate fitted curve
+    xFit_o = linspace(min(x_old), max(x_old), 100);
+    yFit_o = polyval(p_old, xFit_o);
+    h2 =plot(xFit_o, yFit_o, 'Color', clrMap{2}, 'LineWidth', 3,'DisplayName','OLD');
+    
+    % Compute r^2 for the old fit
+    yHat_old = polyval(p_old, x_old);
+    SSE_o = sum((y_old - yHat_old).^2);
+    SST_o = sum((y_old - mean(y_old)).^2);
+    R2_old = 1 - SSE_o / SST_o;
+    r_old = sqrt(max(R2_old, 0)); 
+   
+     % Fishers z transformation to compare correlation coefficients 
+    z_young = atanh(r_young);
+    z_old = atanh(r_old);
+    % For large-sample approximation, use n - polyOrder - 1
+    se_diff = sqrt(1/(n_young - 1) + 1/(n_old - 1));
+    z_stat  = (z_young - z_old) / se_diff;
+    p_value = 2 * (1 - normcdf(abs(z_stat)));
+    
+    % Title with correlation coefficients
+    title(sprintf('%s: Young r=%.2f, Old r=%.2f p=%.3f', strategy_titles{s},...
+        r_young, r_old,p_value),'FontSize',18,'FontWeight','bold');
+    xlabel('CIPL Score (m.s)','FontSize',14,'FontWeight','bold');
+    ylabel('Probability','FontSize',14,'FontWeight','bold');
+    legend([h1,h2],FontSize=12);
+    xlim([0 60]);
+    ylim([0 0.8]);
+    pubify_figure_axis_robust(14,14)
+    hold off;
+    % Save figure
+    saveas(f, fullfile(fig_dir,sprintf('CIPL_%s_quadratic',strategyNames{s})),'png');
+end
+
+
+%% 2) Strategy-Day Plots (individual and group)
+for s = 1:nStrategies
+    %-------------- Individual Rat Plot --------------%
+    stratProb = data1.(strategyNames{s});
+    
+    % Get idx for young and old groups based on the age
+    isYoung = strcmp(data1.Age, 'young');
+    isOld   = strcmp(data1.Age, 'old');
+    
+    % Unique rats and days
+    uniqueDays = unique(data1.Day);
+    uniqueRats = unique(data1.x_TargetID);
+    
+    %Init fig
+    f1 = figure;
+    hold on;
+    
+    % Initialize cell array to save mean strategy 
+    mean_strat = {};
+    validRatIdx = 0;
+    firstYoung = true;
+    firstOld   = true;
+
+    % Loop over each rat
+    for r = 1:numel(uniqueRats)
+        ratID = uniqueRats{r};
+        isCurrentRat = strcmp(data1.x_TargetID, ratID);
+        
+        % Determine if the rat is young or old and choose color
+        if ismember(ratID, data1.x_TargetID(isYoung))
+            ageGroup = 'young';
+            color = clrMap{1};
+        else
+            ageGroup = 'old';
+            color = clrMap{2};
+        end
+        
+        % Preallocate mean use for each day
+        meanUse = nan(1, numel(uniqueDays));
+        % Loop over each day
+        for d = 1:numel(uniqueDays)
+            idx = isCurrentRat & (data1.Day == uniqueDays(d));
+            if any(idx)
+                meanUse(d) = mean(stratProb(idx));
+            end
+        end
+        
+        % Skip rats with missing data for any day -sanity check
+        if any(isnan(meanUse))
+            fprintf('Missing days for %s in strategy %s\n', string(ratID), strategyNames{s});
+            continue;
+        end
+        
+        % Save the datafor ANOVA
+        validRatIdx = validRatIdx + 1;
+        mean_strat{validRatIdx, 1} = ratID;
+        mean_strat{validRatIdx, 2} = ageGroup;
+        mean_strat(validRatIdx, 3:6) = num2cell(meanUse); % Day1-Day4
+
+        % Plot individual points with jitter using swarmchart
+        hSwarm = swarmchart(uniqueDays, meanUse, 20, 'filled', ...
+            'MarkerFaceColor', color, 'MarkerFaceAlpha', 0.5);
+        hSwarm.Annotation.LegendInformation.IconDisplayStyle = 'off';
+
+        % Plot connecting lines -display name only for the first rat of
+        % each group
+        if strcmp(ageGroup, 'young')
+            if firstYoung
+                plot(uniqueDays, meanUse, '-', 'Color', color, 'LineWidth', 1, 'DisplayName', 'Young');
+                firstYoung = false;
+            else
+                plot(uniqueDays, meanUse, '-', 'Color', color, 'LineWidth', 1, 'HandleVisibility','off');
+            end
+        else
+            if firstOld
+                plot(uniqueDays, meanUse, '-', 'Color', color, 'LineWidth', 1, 'DisplayName', 'Old');
+                firstOld = false;
+            else
+                plot(uniqueDays, meanUse, '-', 'Color', color, 'LineWidth', 1, 'HandleVisibility','off');
+            end
+        end
+    end
+    
+    % Figure details for individual rat plot
+    title(strategy_titles{s});
+    xlabel('Day');
+    ylabel('Probability of Strategy Use');
+    xticks(uniqueDays);
+    legend('Location', 'Northeast');
+    ylim([0 0.5]);
+    xlim([0.75 4.25]);
+    pubify_figure_axis_robust(14,14);
+    hold off;
+    % Save fig
+    saveas(f1, fullfile(fig_dir, sprintf('IndividualRats_%s', strategyNames{s})), 'png');
+    close;
+    
+    % Convert cell array to table for ANOVA and post hoc tests
+    mean_strat_table = cell2table(mean_strat, 'VariableNames', ...
+        {'RatID', 'Age', 'Day1', 'Day2', 'Day3', 'Day4'});
+    
+    % Run mixed-design ANOVA (within-subject-Day &between-subject-age)
+    anovaResults = runMixedANOVA(mean_strat_table, {'Day1','Day2','Day3','Day4'});
+    % Run Tukey post hoc tests for the Day factor (by Age)
+    postHocResults = runTukeyPostHocMixed(mean_strat_table, {'Day1','Day2','Day3','Day4'});
+    
+    % Save ANOVA results
+    writetable(anovaResults, fullfile(processed_dir, sprintf('Anova_%s.csv', strategyNames{s})));
+    writetable(postHocResults, fullfile(processed_dir, sprintf('PostHoc_Tukey_%s.csv', strategyNames{s})));
+    
+    %-------------- Overall Bar Plot with Mean, SEM, and Significance Markers --------------%
+    % Compute means and SEM for young and old per day
+    meanYoung = arrayfun(@(d) mean(stratProb(isYoung & (data1.Day == d))), uniqueDays);
+    semYoung  = arrayfun(@(d) std(stratProb(isYoung & (data1.Day == d))) / sqrt(sum(isYoung & (data1.Day == d))), uniqueDays);
+    meanOld   = arrayfun(@(d) mean(stratProb(isOld & (data1.Day == d))), uniqueDays);
+    semOld    = arrayfun(@(d) std(stratProb(isOld & (data1.Day == d))) / sqrt(sum(isOld & (data1.Day == d))), uniqueDays);
+    
+    % Extract individual data points for jitter plotting (cell arrays, one cell per day)
+    dataYoung = arrayfun(@(d) stratProb(isYoung & (data1.Day == d)), uniqueDays, 'UniformOutput', false);
+    dataOld   = arrayfun(@(d) stratProb(isOld & (data1.Day == d)), uniqueDays, 'UniformOutput', false);
+    
+    % Create bar plot using the separate function plot_bar_sem
+    f2 = figure;
+    plot_bar_sem_WaterMaze(uniqueDays, meanYoung, semYoung, meanOld, semOld,...
+        dataYoung, dataOld, postHocResults);
+    %PlotParams
+    title(sprintf('%s: All Trials',strategy_titles{s}),'FontSize',16);
+   
+    xlabel('Day');
+    ylabel('Probability of Strategy Use');
+    legend({'Young', 'Old'}, 'Location', 'Northeast');
+    ylim([0 0.75]);
+    pubify_figure_axis_robust(14,14);
+    hold off;
+    
+    
+    % Save the overall bar plot
+    saveas(f2, fullfile(fig_dir, sprintf('%s_AllTrials', strategyNames{s})), 'png');
+    close;
+    %Figure for mean of each trial per day
+    dataMeanYoung = cell(numel(uniqueDays), 1);
+    dataMeanOld   = cell(numel(uniqueDays), 1);
+    for d = 1:numel(uniqueDays)
+        colName = sprintf('Day%d', d);
+        dataMeanYoung{d} = mean_strat_table{strcmp(mean_strat_table.Age, 'young'), colName};
+        dataMeanOld{d}   = mean_strat_table{strcmp(mean_strat_table.Age, 'old'), colName};
+    end
+    meanYoung = cellfun(@mean, dataMeanYoung);
+    semYoung  = cellfun(@(x) std(x)/sqrt(numel(x)), dataMeanYoung);
+    meanOld   = cellfun(@mean, dataMeanOld);
+    semOld    = cellfun(@(x) std(x)/sqrt(numel(x)), dataMeanOld);
+
+    f3=figure;
+    plot_bar_sem_WaterMaze(uniqueDays, meanYoung, semYoung, meanOld, semOld, dataMeanYoung,...
+     dataMeanOld, postHocResults);
+    %PlotParams
+    title(sprintf('%s: Rat Mean Per Day',strategy_titles{s}),'FontSize',16);
+    xlabel('Day');
+    ylabel('Probability of Strategy Use');
+    legend({'Young', 'Old'}, 'Location', 'Northeast');
+    ylim([0 0.75]);
+    pubify_figure_axis_robust(14,14);
+    hold off;
+    
+    % Save the overall bar plot
+    saveas(f3, fullfile(fig_dir, sprintf('%s_RatMeanPerDay', strategyNames{s})), 'png');
+    close
+end
+
+
+%% 3) Strategy by Group - Non-spatial/Procedural/Allocentric 
+% Define strategy groups and their names
+strategyGroups = {
+    {'thigmotaxis', 'circling', 'random_path'}, 'Non-Goal Oriented';
+    {'scanning', 'chaining'}, 'Procedural';
+    {'directed_search', 'corrected_search', 'direct_path','perseverance'}, 'Allocentric'
+};
+groupNames = strategyGroups(:, 2);  % Extract group labels
+nGroups = numel(groupNames);        % Number of groups
+
+groupStrat=cell(1,3);
+% Extract unique days
+uniqueDays = unique(data1.Day);
+%---------------------- GET MEAN and SEM per group ----------------------%
+% Loop over each strategy group
+for g = 1:nGroups
+    % Initialize figure for individual rat plots
+    f1 = figure;
+    hold on;
+
+    % Get the strategies in the current group
+    currentStrategies = strategyGroups{g, 1};
+    groupProb=data1.(currentStrategies{1});
+    for ii=2:numel(currentStrategies)
+        groupProb=groupProb+data1.(currentStrategies{ii});
+    end
+    groupStrat{g}=groupProb;
+
+    % Get idx for young and old groups based on the age
+    isYoung = strcmp(data1.Age, 'young');
+    isOld   = strcmp(data1.Age, 'old');
+    
+    % Initialize cell array to save mean strategy use per rat
+    mean_strat = {};
+    validRatIdx = 0;
+    firstYoung = true;
+    firstOld = true;
+
+    % Loop over each rat
+    uniqueRats = unique(data1.x_TargetID);
+    for r = 1:numel(uniqueRats)
+        ratID = uniqueRats{r};
+        isCurrentRat = strcmp(data1.x_TargetID, ratID);
+
+        % Determine if the rat is young or old and choose color
+        if ismember(ratID, data1.x_TargetID(strcmp(data1.Age, 'young')))
+            ageGroup = 'young';
+            color = clrMap{1};
+        else
+            ageGroup = 'old';
+            color = clrMap{2};
+        end
+
+        % Preallocate mean use for each day
+        meanUse = nan(1, numel(uniqueDays));
+
+        % Loop over each day
+        for d = 1:numel(uniqueDays)
+            dayIdx = isCurrentRat & (data1.Day == uniqueDays(d));
+            if any(dayIdx)
+                meanUse(d) = mean(groupProb(dayIdx));
+            end
+        end
+
+        if any(isnan(meanUse))
+            fprintf('Missing days for %s in group %s\n', string(ratID), groupNames{g});
+            continue;
+        end
+
+        % Save the data for ANOVA
+        validRatIdx = validRatIdx + 1;
+        mean_strat{validRatIdx, 1} = ratID;
+        mean_strat{validRatIdx, 2} = ageGroup;
+        mean_strat(validRatIdx, 3:6) = num2cell(meanUse); % Day1-Day4
+
+        % Plot individual points with jitter using swarmchart
+        hSwarm = swarmchart(uniqueDays, meanUse, 20, 'filled', ...
+            'MarkerFaceColor', color, 'MarkerFaceAlpha', 0.5);
+        hSwarm.Annotation.LegendInformation.IconDisplayStyle = 'off';
+
+        % Plot connecting lines - display name only for the first rat of each group
+        if strcmp(ageGroup, 'young')
+            if firstYoung
+                plot(uniqueDays, meanUse, '-', 'Color', color, 'LineWidth', 1, 'DisplayName', 'Young');
+                firstYoung = false;
+            else
+                plot(uniqueDays, meanUse, '-', 'Color', color, 'LineWidth', 1, 'HandleVisibility', 'off');
+            end
+        else
+            if firstOld
+                plot(uniqueDays, meanUse, '-', 'Color', color, 'LineWidth', 1, 'DisplayName', 'Old');
+                firstOld = false;
+            else
+                plot(uniqueDays, meanUse, '-', 'Color', color, 'LineWidth', 1, 'HandleVisibility', 'off');
+            end
+        end
+    end
+
+    % Figure details for individual rat plot
+    title(groupNames{g});
+    xlabel('Day');
+    ylabel('Probability of Strategy Use');
+    xticks(uniqueDays);
+    legend('Location', 'Northeast');
+    ylim([0 1]);
+    xlim([0.75 4.25]);
+    pubify_figure_axis_robust(14, 14);
+    hold off;
+
+    % Save individual rat plot
+    saveas(f1, fullfile(fig_dir, sprintf('IndividualRats_%s', groupNames{g})), 'png');
+    close;
+
+    % Convert cell array to table for ANOVA and post hoc tests
+    mean_strat_table = cell2table(mean_strat, 'VariableNames', ...
+        {'RatID', 'Age', 'Day1', 'Day2', 'Day3', 'Day4'});
+
+    % Run mixed-design ANOVA (within-subject-Day & between-subject-age)
+    anovaResults = runMixedANOVA(mean_strat_table, {'Day1', 'Day2', 'Day3', 'Day4'});
+    % Run Tukey post hoc tests for the Day factor (by Age)
+    postHocResults = runTukeyPostHocMixed(mean_strat_table, {'Day1', 'Day2', 'Day3', 'Day4'});
+
+    % Save ANOVA results
+    writetable(anovaResults, fullfile(processed_dir, sprintf('Anova_%s.csv', groupNames{g})));
+    writetable(postHocResults, fullfile(processed_dir, sprintf('PostHoc_Tukey_%s.csv', groupNames{g})));
+
+    %-------------- Overall Bar Plot with Mean, SEM, and Significance Markers --------------%
+
+    % Compute means and SEM for young and old per day using all trials
+    meanYoung = arrayfun(@(d) mean(groupProb(isYoung & (data1.Day == d))), uniqueDays);
+    semYoung  = arrayfun(@(d) std(groupProb(isYoung & (data1.Day == d))) / sqrt(sum(isYoung & (data1.Day == d))), uniqueDays);
+    meanOld   = arrayfun(@(d) mean(groupProb(isOld & (data1.Day == d))), uniqueDays);
+    semOld    = arrayfun(@(d) std(groupProb(isOld & (data1.Day == d))) / sqrt(sum(isOld & (data1.Day == d))), uniqueDays);
+    
+    % Extract individual data points for jitter plotting (cell arrays, one cell per day)
+    dataYoung = arrayfun(@(d) groupProb(isYoung & (data1.Day == d)), uniqueDays, 'UniformOutput', false);
+    dataOld   = arrayfun(@(d) groupProb(isOld & (data1.Day == d)), uniqueDays, 'UniformOutput', false);
+    
+    % Create bar plot using the separate function plot_bar_sem
+    f2 = figure;
+    plot_bar_sem_WaterMaze(uniqueDays, meanYoung, semYoung, meanOld, semOld,...
+        dataYoung, dataOld, postHocResults);
+    %PlotParams
+    title(sprintf('%s: All Trials',groupNames{g}),'FontSize',16);
+   
+    xlabel('Day');
+    ylabel('Probability of Strategy Use');
+    legend({'Young', 'Old'}, 'Location', 'best');
+    ylim([0 1.35]);
+    pubify_figure_axis_robust(14,14);
+    hold off;
+
+     % Save fig
+    saveas(f2, fullfile(fig_dir, sprintf('%s_AllTrials', groupNames{g})), 'png');
+    close;
+
+    %-------------- Figure for Mean Per Rat Per Day --------------%
+    
+    dataMeanYoung = cell(numel(uniqueDays), 1);
+    dataMeanOld   = cell(numel(uniqueDays), 1);
+
+    for d = 1:numel(uniqueDays)
+        colName = sprintf('Day%d', d);
+        dataMeanYoung{d} = mean_strat_table{strcmp(mean_strat_table.Age, 'young'), colName};
+        dataMeanOld{d}   = mean_strat_table{strcmp(mean_strat_table.Age, 'old'), colName};
+    end
+
+    meanYoung = cellfun(@mean, dataMeanYoung);
+    semYoung  = cellfun(@(x) std(x) / sqrt(numel(x)), dataMeanYoung);
+    meanOld   = cellfun(@mean, dataMeanOld);
+    semOld    = cellfun(@(x) std(x) / sqrt(numel(x)), dataMeanOld);
+
+    f3 = figure;
+    plot_bar_sem_WaterMaze(uniqueDays, meanYoung, semYoung, meanOld, semOld, dataMeanYoung, dataMeanOld, postHocResults);
+
+    % Plot parameters
+    title(sprintf('%s: Rat Mean Per Day', groupNames{g}), 'FontSize', 16);
+    xlabel('Day');
+    ylabel('Probability of Strategy Use');
+    legend({'Young', 'Old'}, 'Location', 'best');
+    ylim([0 1.25]);
+    pubify_figure_axis_robust(14, 14);
+    hold off;
+
+    % Save the overall bar plot for mean per rat per day
+    saveas(f3, fullfile(fig_dir, sprintf('%s_RatMeanPerDay', groupNames{g})), 'png');
+    close;
+end
+
+
+
+
+
+%% 4) Entropy Calculation
+
+youngColor = [0 0.6 0];    
+oldColor   = [0.5 0 0.5];  
+
+%------------------ Compute Entropy for Each Trial ------------------%
+% Entropy formula: H = -sum(p .* log2(p + eps))
+pMat = data1{:, 11:19};
+entropy_vals = -sum(pMat .* log2(pMat + eps), 2);
+data1.entropy = entropy_vals;
+
+% Make Entropy Table for stats
+uniqueRats = unique(data1.x_TargetID);
+uniqueDays = unique(data1.Day);
+nRats = numel(uniqueRats);
+
+% Preallocate cell arrays
+meanDayEntropy = nan(nRats, numel(uniqueDays));
+AgeCell = cell(nRats,1);
+
+for r = 1:nRats
+    ratID = uniqueRats{r};
+    idxRat = strcmp(data1.x_TargetID, ratID);
+    % Assume age is consistent for a rat.
+    AgeCell{r} = data1.Age{find(idxRat,1)};
+    for d = 1:numel(uniqueDays)
+        idxDay = idxRat & (data1.Day == uniqueDays(d));
+        meanDayEntropy(r,d) = mean(data1.entropy(idxDay));
+    end
+end
+
+%Generate Table
+entropyTable = table(uniqueRats, AgeCell, meanDayEntropy(:,1), meanDayEntropy(:,2), meanDayEntropy(:,3), meanDayEntropy(:,4), ...
+    'VariableNames', {'RatID', 'Age', 'Day1', 'Day2', 'Day3', 'Day4'});
+
+
+% Run mixed-design ANOVA (within-subject-Day &between-subject-age)
+anovaResults = runMixedANOVA(entropyTable, {'Day1','Day2','Day3','Day4'});
+postHocResults = runTukeyPostHocMixed(entropyTable, {'Day1','Day2','Day3','Day4'});
+writetable(anovaResults, fullfile(processed_dir, 'Entropy_ANOVA.csv'));
+writetable(postHocResults, fullfile(processed_dir, 'Entropy_PostHoc_Tukey.csv'));   
+
+
+%------------------Entropy for Each Trial for Each Rat ------------------%
+fe1=figure;
+hold on;
+uniqueRats = unique(data1.x_TargetID);  % Unique rat IDs
+jitterAmount = 0.1;  % Adjust the jitter range as needed
+
+for r = 1:length(uniqueRats)
+    ratID = uniqueRats{r};
+    idx = strcmp(data1.x_TargetID, ratID);
+    
+    % Get Trials
+    trialNumbers = data1.x_Trial(idx);
+    
+    % Add jitter to the trial numbers
+    jitteredTrials_Y = trialNumbers - (rand(size(trialNumbers))-0.25)*jitterAmount -0.1;
+    jitteredTrials_O = trialNumbers + (rand(size(trialNumbers))+0.25)*jitterAmount +0.1;
+    
+    % Extract entropy values for this rat
+    entropy_r = data1.entropy(idx);
+    
+    % Determine age
+    if strcmp(data1.Age{find(idx,1)}, 'young')
+        scatter(jitteredTrials_Y, entropy_r, 36, 'MarkerFaceColor', youngColor, 'MarkerEdgeColor', 'none');
+    else
+        scatter(jitteredTrials_O, entropy_r, 36, 'MarkerFaceColor', oldColor, 'MarkerEdgeColor', 'none');
+    end
+end
+% Figure Properties
+xlabel('Trial');
+ylabel('Entropy');
+title('Entropy: All Trials and All Rats');
+pubify_figure_axis_robust(14,14);
+hold off;
+saveas(fe1, fullfile(fig_dir, 'EntropyAllTrials'), 'png');
+close;
+
+
+
+%------------------ Calculate Mean Entropy per Rat per Day ------------------%
+uniqueAges = {'young','old'};  
+
+
+% For each day and each age group, compute the group mean and SEM from the per-rat means.
+meanEntropy = zeros(numel(uniqueDays), nAges);
+semEntropy = zeros(numel(uniqueDays), nAges);
+% Also build cell arrays holding the per-rat means for each day (for scatter overlay)
+dataEntropyYoung = cell(numel(uniqueDays),1);
+dataEntropyOld   = cell(numel(uniqueDays),1);
+
+for d = 1:numel(uniqueDays)
+    for j = 1:numel(uniqueAges)
+        idx = strcmp(entropyTable.Age, uniqueAges{j});
+        % Extract the per-rat mean for day d
+        vals = meanDayEntropy(idx, d);
+        meanEntropy(d,j) = mean(vals,'omitnan');
+        semEntropy(d,j)  = std(vals, 'omitnan') / sqrt(sum(~isnan(vals)));
+        % Save the per-rat means into cell arrays
+        if strcmp(uniqueAges{j}, 'young')
+            dataEntropyYoung{d} = vals;
+        elseif strcmp(uniqueAges{j}, 'old')
+            dataEntropyOld{d} = vals;
+        end
+    end
+end
+
+
+%---------------- PLOT PER RAT PER DAY MEAN ENTROPY ---------------------------%
+fe2=figure;
+hold on;
+plot_bar_sem_WaterMaze(uniqueDays, meanEntropy(:,1), semEntropy(:,1), ...
+    meanEntropy(:,2), semEntropy(:,2), dataEntropyYoung, dataEntropyOld, postHocResults);
+title('Mean Entropy (Rats Day Means)');
+xlabel('Day');
+ylabel('Entropy');
+pubify_figure_axis_robust(14,14);
+xticks(uniqueDays);
+hold off;
+saveas(fe2, fullfile(fig_dir, 'Entropy_MeanRat'), 'png');
+close;
+% Plot all rats as line plot
+fe3 = figure;
+hold on;
+nRats = size(dayEntropy,1);  % Number of rats
+for r = 1:nRats
+    if strcmp(AgeCell{r}, 'young')
+        plot(uniqueDays, dayEntropy(r,:), '-o', 'Color', youngColor, 'LineWidth', 1.5);
+    else
+        plot(uniqueDays, dayEntropy(r,:), '-o', 'Color', oldColor, 'LineWidth', 1.5);
+    end
+end
+xlabel('Day');
+ylabel('Entropy');
+title('Entropy Per Rat');
+pubify_figure_axis_robust(14,14);
+xticks(uniqueDays);
+hold off;
+saveas(fe3, fullfile(fig_dir, 'Entropy_RatChanges'), 'png');
+close;
+
+%--------------- PLOT PER RAT PER DAY MEAN ENTROPY ----------------------%
+fe4=figure;
+hold on;
+% Calculate dataEntropy for all trials
+dataEntropyYoung = cell(numel(uniqueDays),1);
+dataEntropyOld   = cell(numel(uniqueDays),1);
+for d = 1:numel(uniqueDays)
+    dataEntropyYoung{d}=entropy_vals(uniqueDays(d) & strcmp(data1.Age,'young'));
+    dataEntropyOld{d}=entropy_vals(data1.Day == uniqueDays(d) & strcmp(data1.Age,'old'));
+end
+plot_bar_sem_WaterMaze(uniqueDays, meanEntropy(:,1), semEntropy(:,1), ...
+    meanEntropy(:,2), semEntropy(:,2), dataEntropyYoung, dataEntropyOld, postHocResults);
+title('Mean Entropy (All Trials)');
+xlabel('Day');
+ylabel('Entropy');
+pubify_figure_axis_robust(14,14);
+xticks(uniqueDays)
+hold off;
+saveas(fe4, fullfile(fig_dir, 'Entropy_Mean_AllTrials'), 'png');
+close;
+%% 5) Group Strategy Based Entropy
+% NEED TO HAVE RUN GROUP STRAT BEFORE
+%------------------ Compute Entropy for Each Trial ------------------%
+% Entropy formula: H = -sum(p .* log2(p + eps))
+pMat = [groupStrat{1}';groupStrat{2}';groupStrat{3}']';
+entropy_vals = -sum(pMat .* log2(pMat + eps), 2);
+data1.entropy = entropy_vals;
+
+% Make Entropy Table for stats
+uniqueRats = unique(data1.x_TargetID);
+uniqueDays = unique(data1.Day);
+nRats = numel(uniqueRats);
+
+% Preallocate cell arrays
+meanDayEntropy = nan(nRats, numel(uniqueDays));
+AgeCell = cell(nRats,1);
+
+for r = 1:nRats
+    ratID = uniqueRats{r};
+    idxRat = strcmp(data1.x_TargetID, ratID);
+    % Assume age is consistent for a rat.
+    AgeCell{r} = data1.Age{find(idxRat,1)};
+    for d = 1:numel(uniqueDays)
+        idxDay = idxRat & (data1.Day == uniqueDays(d));
+        meanDayEntropy(r,d) = mean(data1.entropy(idxDay));
+    end
+end
+
+%Generate Table
+entropyTable = table(uniqueRats, AgeCell, meanDayEntropy(:,1), meanDayEntropy(:,2), meanDayEntropy(:,3), meanDayEntropy(:,4), ...
+    'VariableNames', {'RatID', 'Age', 'Day1', 'Day2', 'Day3', 'Day4'});
+
+
+% Run mixed-design ANOVA (within-subject-Day &between-subject-age)
+anovaResults = runMixedANOVA(entropyTable, {'Day1','Day2','Day3','Day4'});
+postHocResults = runTukeyPostHocMixed(entropyTable, {'Day1','Day2','Day3','Day4'});
+writetable(anovaResults, fullfile(processed_dir, 'GroupStrat_Entropy_ANOVA.csv'));
+writetable(postHocResults, fullfile(processed_dir, 'GroupStrat_Entropy_PostHoc_Tukey.csv'));   
+
+
+%------------------Entropy for Each Trial for Each Rat ------------------%
+fe1=figure;
+hold on;
+uniqueRats = unique(data1.x_TargetID);  % Unique rat IDs
+jitterAmount = 0.1;  % Adjust the jitter range as needed
+
+for r = 1:length(uniqueRats)
+    ratID = uniqueRats{r};
+    idx = strcmp(data1.x_TargetID, ratID);
+    
+    % Get Trials
+    trialNumbers = data1.x_Trial(idx);
+    
+    % Add jitter to the trial numbers
+    jitteredTrials_Y = trialNumbers - (rand(size(trialNumbers))-0.25)*jitterAmount -0.1;
+    jitteredTrials_O = trialNumbers + (rand(size(trialNumbers))+0.25)*jitterAmount +0.1;
+    
+    % Extract entropy values for this rat
+    entropy_r = data1.entropy(idx);
+    
+    % Determine age
+    if strcmp(data1.Age{find(idx,1)}, 'young')
+        scatter(jitteredTrials_Y, entropy_r, 36, 'MarkerFaceColor', youngColor, 'MarkerEdgeColor', 'none');
+    else
+        scatter(jitteredTrials_O, entropy_r, 36, 'MarkerFaceColor', oldColor, 'MarkerEdgeColor', 'none');
+    end
+end
+% Figure Properties
+xlabel('Trial');
+ylabel('Entropy');
+title('Entropy: All Trials  - Grouped By Strategy Type');
+pubify_figure_axis_robust(14,14);
+hold off;
+saveas(fe1, fullfile(fig_dir, 'GroupStrat_EntropyAllTrials'), 'png');
+close;
+
+
+
+%------------------ Calculate Mean Entropy per Rat per Day ------------------%
+uniqueAges = {'young','old'};  
+
+
+% For each day and each age group, compute the group mean and SEM from the per-rat means.
+meanEntropy = zeros(numel(uniqueDays), nAges);
+semEntropy = zeros(numel(uniqueDays), nAges);
+% Also build cell arrays holding the per-rat means for each day (for scatter overlay)
+dataEntropyYoung = cell(numel(uniqueDays),1);
+dataEntropyOld   = cell(numel(uniqueDays),1);
+
+for d = 1:numel(uniqueDays)
+    for j = 1:numel(uniqueAges)
+        idx = strcmp(entropyTable.Age, uniqueAges{j});
+        % Extract the per-rat mean for day d
+        vals = meanDayEntropy(idx, d);
+        meanEntropy(d,j) = mean(vals,'omitnan');
+        semEntropy(d,j)  = std(vals, 'omitnan') / sqrt(sum(~isnan(vals)));
+        % Save the per-rat means into cell arrays
+        if strcmp(uniqueAges{j}, 'young')
+            dataEntropyYoung{d} = vals;
+        elseif strcmp(uniqueAges{j}, 'old')
+            dataEntropyOld{d} = vals;
+        end
+    end
+end
+
+
+%---------------- PLOT PER RAT PER DAY MEAN ENTROPY ---------------------------%
+fe2=figure;
+hold on;
+plot_bar_sem_WaterMaze(uniqueDays, meanEntropy(:,1), semEntropy(:,1), ...
+    meanEntropy(:,2), semEntropy(:,2), dataEntropyYoung, dataEntropyOld, postHocResults);
+title('Entropy (Rats Day Means)  - Grouped By Strategy Type');
+xlabel('Day');
+ylabel('Entropy');
+pubify_figure_axis_robust(14,14);
+xticks(uniqueDays);
+hold off;
+saveas(fe2, fullfile(fig_dir, 'GroupStrat_Entropy_MeanRat'), 'png');
+close;
+
+% Plot all rats as line plot
+fe3 = figure;
+hold on;
+nRats = size(meanDayEntropy,1);  % Number of rats
+for r = 1:nRats
+    if strcmp(AgeCell{r}, 'young')
+        plot(uniqueDays, meanDayEntropy(r,:), '-o', 'Color', youngColor, 'LineWidth', 1.5);
+    else
+        plot(uniqueDays, meanDayEntropy(r,:), '-o', 'Color', oldColor, 'LineWidth', 1.5);
+    end
+end
+xlabel('Day');
+ylabel('Entropy');
+title('Entropy Per Rat');
+pubify_figure_axis_robust(14,14);
+xticks(uniqueDays);
+hold off;
+saveas(fe3, fullfile(fig_dir, 'GroupStrat_Entropy_RatChanges'), 'png');
+close;
+%--------------- PLOT PER RAT PER DAY MEAN ENTROPY ----------------------%
+fe4=figure;
+hold on;
+% Calculate dataEntropy for all trials
+dataEntropyYoung = cell(numel(uniqueDays),1);
+dataEntropyOld   = cell(numel(uniqueDays),1);
+for d = 1:numel(uniqueDays)
+    dataEntropyYoung{d}=entropy_vals(uniqueDays(d) & strcmp(data1.Age,'young'));
+    dataEntropyOld{d}=entropy_vals(data1.Day == uniqueDays(d) & strcmp(data1.Age,'old'));
+end
+plot_bar_sem_WaterMaze(uniqueDays, meanEntropy(:,1), semEntropy(:,1), ...
+    meanEntropy(:,2), semEntropy(:,2), dataEntropyYoung, dataEntropyOld, postHocResults);
+title(' Entropy (All Trials) - Grouped By Strategy Type');
+xlabel('Day');
+ylabel('Entropy');
+pubify_figure_axis_robust(14,14);
+xticks(uniqueDays)
+hold off;
+saveas(fe4, fullfile(fig_dir, 'GroupStrat_Entropy_Mean_AllTrials'), 'png');
+close;
+
+
+%% END) Plot Strategy by Trial - All - Very Messy 
+
+for s = 1:nStrategies
+    %-------------- Individual Rat Plot --------------%
+    stratProb = data1.(strategyNames{s});
+    
+    % Get idx for young and old groups based on the age
+    isYoung = strcmp(data1.Age, 'young');
+    isOld   = strcmp(data1.Age, 'old');
+
+    uniqueRats = unique(data1.x_TargetID);% Unique rats 
+    trials=linspace(1,24,24);
+    
+    %Init fig
+    f1 = figure;
+    hold on;
+    
+    % Initialize cell array to save mean strategy 
+     validRatIdx = 0;
+    firstYoung = true;
+    firstOld   = true;
+
+    % Loop over each rat
+    for r = 1:numel(uniqueRats)
+        ratID = uniqueRats{r};
+        isCurrentRat = strcmp(data1.x_TargetID, ratID);
+        
+        % Determine if the rat is young or old and choose color
+        if ismember(ratID, data1.x_TargetID(isYoung))
+            ageGroup = 'young';
+            color = clrMap{1};
+        else
+            ageGroup = 'old';
+            color = clrMap{2};
+        end
+        strat_use=stratProb(isCurrentRat);
+        
+        
+        % Skip rats with missing data for any day -sanity check
+        if any(isnan(strat_use))
+            fprintf('Missing trial for %s in strategy %s\n', string(ratID), strategyNames{s});
+            continue;
+        end
+        
+
+        % Plot individual points swarmchart
+        hSwarm = swarmchart(trials, strat_use, 20, 'filled', ...
+            'MarkerFaceColor', color, 'MarkerFaceAlpha', 0.5);
+        hSwarm.Annotation.LegendInformation.IconDisplayStyle = 'off';
+
+        % Plot connecting lines -display name only for the first rat of
+        % each group
+        if strcmp(ageGroup, 'young')
+            if firstYoung
+                plot(trials, strat_use, '-', 'Color', color, 'LineWidth', 1, 'DisplayName', 'Young');
+                firstYoung = false;
+            else
+                plot(trials, strat_use, '-', 'Color', color, 'LineWidth', 1, 'HandleVisibility','off');
+            end
+        else
+            if firstOld
+                plot(trials, strat_use, '-', 'Color', color, 'LineWidth', 1, 'DisplayName', 'Old');
+                firstOld = false;
+            else
+                plot(trials, strat_use, '-', 'Color', color, 'LineWidth', 1, 'HandleVisibility','off');
+            end
+        end
+    end
+    
+    % Figure details for individual rat plot
+    title(strategy_titles{s});
+    xlabel('Day');
+    ylabel('Probability of Strategy Use');
+    xticks(uniqueDays);
+    legend('Location', 'Northeast');
+    ylim([0 0.5]);
+    xlim([0.75 4.25]);
+    pubify_figure_axis_robust(14,14);
+    hold off;
+    % Save fig
+    saveas(f1, fullfile(fig_dir, sprintf('IndividualRats_%s', strategyNames{s})), 'png');
+    close;
+    
+   
+end
