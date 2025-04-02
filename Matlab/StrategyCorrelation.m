@@ -1120,13 +1120,17 @@ strategyGroups = {
 };
 groupNames = strategyGroups(:, 2);  % Extract group labels
 nGroups = numel(groupNames);
-
+% Numel & unique variables
 groupStrat = cell(1, nGroups);
-% Extract unique days (already defined), unique rats, and unique platforms.
-% uniqueDays = unique(data1.Day);
-% uniqueRats = unique(data1.x_TargetID);
-% uniquePlatforms = unique(data1.pd);
-
+uniqueDays=unique(data1.Day);
+uniqueRats=unique(data1.x_TargetID);
+uniquePlatforms=unique(data1.pd);
+% Colors for plotting
+youngShades = [0.80 1.00 0.80; 0.60 0.85 0.60; 0.30 0.70 0.30; 0.00 0.60 0.00];
+oldShades   = [0.85 0.65 0.85; 0.75 0.40 0.75; 0.60 0.25 0.60; 0.50 0.00 0.50];
+clrYoungSig = [0 0.6 0];    % green
+clrOldSig   = [0.5 0 0.5];  % purple
+clrBothSig  = [0.3 0.3 0.3];% gray
 % Loop over each strategy group to compute the aggregated group probability
 for g = 1:nGroups
     currentStrategies = strategyGroups{g,1};
