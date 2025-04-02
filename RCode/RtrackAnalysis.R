@@ -1,5 +1,6 @@
 library(Rtrack)
 library(dplyr)
+library(openxlsx)
 library(readxl)
 library(ggplot2)
 library(data.table)
@@ -17,13 +18,13 @@ cohort_file_paths <- sapply(cohort_list, function(cohort) {
   USE.NAMES = FALSE)
 
 # all rats experiment description file (if exists)
-all_rats_desc_fp <- file.path(rtrack_folder, "All_Rats.xlsx")
+all_rats_desc_fp <- file.path(rtrack_folder, "/All_Rats.xlsx")
 
 
 # Add to or create All Rats file ------------------------------------------
 
 all_rats_experiment_desc_file <- function(cohort_list, cohort_file_paths, rat_list, rtrack_folder) {
-  all_rats_fp <- file.path(rtrack_folder, "All_Rats.csv") # output file path
+  all_rats_fp <- file.path(rtrack_folder, "All_Rats.xlsx") # output file path
   all_rats <- data.frame()
   
   # Ensure that the cohort list and cohort file paths are the same length
@@ -73,10 +74,10 @@ all_rats_experiment_desc_file <- function(cohort_list, cohort_file_paths, rat_li
     all_rats <- bind_rows(existing_data, all_rats)
   }
   
-  # Write combined data to output file
+  # Write combined data to an Excel file
   if (nrow(all_rats) > 0) {
     dir.create(rtrack_folder, showWarnings = FALSE, recursive = TRUE)
-    write.csv(all_rats, all_rats_fp, row.names = FALSE)
+    openxlsx::write.xlsx(all_rats, all_rats_fp, overwrite = TRUE)
     message(paste("File", basename(all_rats_fp), "has been created/updated successfully"))
   } else {
     message("No new data to append.")
