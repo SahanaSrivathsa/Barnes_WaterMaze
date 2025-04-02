@@ -45,13 +45,53 @@ nStrategies = numel(strategyNames);
 
 strategy_titles={'Thigmotaxis','Circling','Random Path','Scanning',...
     'Chaining','Directed Search','Corrected Search','Direct Path','Perseverance'};
+%% Change platform groups -test
+data1.pd(data1.pd==4)=3;
 
+%% CHECK FOR CONSISTENCY in datasets (Trial no and full values)
 
-%% CHECK THIS PORTION right after 
-% Remove rows where no matching Platform_CIPL was found -- CHECK
- % validIdx = ~isnan(platformScores);
- % data1 = data1(validIdx,:);
- % platformScores = platformScores(validIdx);
+%--- For data1: Check that each unique x_TargetID has 24 unique trials ---
+grp1 = varfun(@(x) numel(unique(x)), data1, 'GroupingVariables', 'x_TargetID', 'InputVariables', 'x_Trial');
+% The new variable name created by varfun is 'Fun_x_Trial'
+rats_to_remove = grp1.x_TargetID(grp1.Fun_x_Trial ~= 24);
+
+if ~isempty(rats_to_remove)
+    fprintf('Removing the following x_TargetID from data1 (incomplete trials):\n');
+    disp(rats_to_remove);
+    data1 = data1(~ismember(data1.x_TargetID, rats_to_remove), :);
+else
+    fprintf('All x_TargetID in data1 have 24 unique trials.\n');
+end
+
+%--- For data2: Check that each Animal has 24 unique trials ---
+grp2 = varfun(@(x) numel(unique(x)), data2, 'GroupingVariables', 'Animal', 'InputVariables', 'Trial');
+animals_incomplete = grp2.Animal(grp2.Fun_Trial ~= 24);
+
+if ~isempty(animals_incomplete)
+    fprintf('Removing the following Animals from data2 (incomplete trials):\n');
+    disp(animals_incomplete);
+    data2 = data2(~ismember(data2.Animal, animals_incomplete), :);
+else
+    fprintf('All Animals in data2 have 24 unique trials.\n');
+end
+
+%--- For data2: Remove Animals with any NaN in Platform_CIPL ---
+grp_nan = varfun(@(x) any(isnan(x)), data2, 'GroupingVariables', 'Animal', 'InputVariables', 'Platform_CIPL');
+animals_with_nan = grp_nan.Animal(grp_nan.Fun_Platform_CIPL);
+
+if ~isempty(animals_with_nan)
+    fprintf('Removing the following Animals from data2 (NaN in Platform_CIPL):\n');
+    disp(animals_with_nan);
+    data2 = data2(~ismember(data2.Animal, animals_with_nan), :);
+else
+    fprintf('No Animals with NaN in Platform_CIPL in data2.\n');
+end
+
+%--- Synchronize data1 and data2: Keep only animals that exist in both datasets ---
+commonAnimals = intersect(unique(data1.x_TargetID), unique(string(data2.Animal)));
+
+data1 = data1(ismember(data1.x_TargetID, commonAnimals), :);
+data2 = data2(ismember(string(data2.Animal), commonAnimals), :);
 
 
 %% 1) CIPL-Strategy  Plots- All trials
@@ -819,6 +859,507 @@ xticks(uniqueDays)
 hold off;
 saveas(fe4, fullfile(fig_dir, 'GroupStrat_Entropy_Mean_AllTrials'), 'png');
 close;
+
+
+
+%% 6) Individual Strategy x Platform Group
+
+%Unique variablers
+uniqueDays=unique(data1.Day);
+uniqueRats=unique(data1.x_TargetID);
+uniquePlatforms=unique(data1.pd);
+% Colors for plotting
+youngShades = [0.80 1.00 0.80; 0.60 0.85 0.60; 0.30 0.70 0.30; 0.00 0.60 0.00];
+oldShades   = [0.85 0.65 0.85; 0.75 0.40 0.75; 0.60 0.25 0.60; 0.50 0.00 0.50];
+clrYoungSig = [0 0.6 0];    % green
+clrOldSig   = [0.5 0 0.5];  % purple
+clrBothSig  = [0.3 0.3 0.3];% gray
+
+%Loop over strategies
+for s = 1:numel(strategyNames)
+    stratName = strategyNames{s};
+    stratTitle = strategy_titles{s};
+    
+    % Determine number of platforms dynamically
+    nPlat = numel(uniquePlatforms);
+    % Build measure variable names as cell array, e.g. {'P1','P2','P3','P4'}.
+    measureVars = arrayfun(@(x) sprintf('P%d', x), uniquePlatforms, 'UniformOutput', false);
+    
+    % Initialize master cell array: each row will be {RatID, Age, Day, P1, P2, ... PnPlat}
+    master_data = {};    
+    % Loop over each day
+    for d = 1:numel(uniqueDays)
+        dVal = uniqueDays(d);
+        dayData = data1(data1.Day == dVal, :);
+        
+        % Loop over each rat (subject) present in dayData
+        for r = 1:numel(uniqueRats)
+            ratID = uniqueRats{r};
+            isCurrentRat = strcmp(dayData.x_TargetID, ratID);
+            if ~any(isCurrentRat)
+                continue; % rat not present on this day
+            end
+            % Get the rat's Age (assumed constant within rat)
+            ratAge = unique(dayData.Age(isCurrentRat));
+            if iscell(ratAge)
+                ratAge = ratAge{1};
+            end
+            
+            % For each platform, compute the mean strategy usage for this rat on this day.
+            meanUse = nan(1, nPlat);
+            for p = 1:nPlat
+                pVal = uniquePlatforms(p);
+                idx = isCurrentRat & (dayData.pd == pVal);
+                if any(idx)
+                    meanUse(p) = mean(dayData.(stratName)(idx));
+                end
+            end
+            
+            % Create a row cell with 3 fixed columns then nPlat columns.
+            row = {ratID, ratAge, dVal};
+            for p = 1:nPlat
+                row = [row, {meanUse(p)}];
+            end
+            master_data(end+1,:) = row;
+        end
+    end
+    
+    % Build variable names: fixed names and then the dynamic measureVars
+    measureVars = arrayfun(@(x) sprintf('P%d', x), uniquePlatforms, 'UniformOutput', false);
+    measureVars = measureVars(:)';  % force row vector
+    varNames = [{'RatID','Age','Day'}, measureVars];
+    master_table = cell2table(master_data, 'VariableNames', varNames);
+    
+    %-------- Run ANOVA & Tukey Post Hoc for each day and combine results
+    all_anova = table();
+    all_tukey = table();
+    for d = 1:numel(uniqueDays)
+        dVal = uniqueDays(d);
+        day_table = master_table(master_table.Day == dVal, :);
+        % Create a reduced table with only Age and the repeated measures variables.
+        anova_tbl = day_table(:, [{'Age'}, measureVars]);
+        
+        % Run repeated measures ANOVA and post hoc tests on this reduced table.
+        anovaResults = runMixedANOVA(anova_tbl, measureVars,'Platform');
+        postHocResults = runTukeyPostHocMixed(anova_tbl, measureVars,'Platform');
+        
+      
+        % Add a column to indicate Day
+        anovaResults.Day = repmat(dVal, height(anovaResults), 1);
+        postHocResults.Day = repmat(dVal, height(postHocResults), 1);
+        % Remove row names for concatenation
+        anovaResults.Properties.RowNames = {};
+        postHocResults.Properties.RowNames = {};
+        
+        all_anova = [all_anova; anovaResults];
+        all_tukey = [all_tukey; postHocResults];
+    end
+    
+    % Save combined ANOVA & Tukey results for this strategy.
+    anovaFile = fullfile(fig_dir, sprintf('3%s_PlatformGroups_ANOVA.csv', stratTitle));
+    tukeyFile = fullfile(fig_dir, sprintf('3%s_PlatformGroups_Tukey.csv', stratTitle));
+    writetable(all_anova, anovaFile);
+    writetable(all_tukey, tukeyFile);
+    
+    %-----------------Compute summary statistics for plotting
+    nDays = numel(uniqueDays);
+    % Preallocate matrices for young and old (nDays x nPlat)
+    meanYoung = nan(nDays, nPlat);
+    semYoung  = nan(nDays, nPlat);
+    meanOld   = nan(nDays, nPlat);
+    semOld    = nan(nDays, nPlat);
+    dataYoung = cell(nDays, nPlat);
+    dataOld   = cell(nDays, nPlat);
+    
+    for d = 1:nDays
+        dVal = uniqueDays(d);
+        day_tbl = master_table(master_table.Day == dVal, :);
+        for p = 1:nPlat
+            colName = measureVars{p};  % e.g., 'P1', 'P2', etc.
+            % For young rats:
+            yVals = day_tbl{strcmp(day_tbl.Age, 'young'), colName};
+            meanYoung(d, p) = mean(yVals, 'omitnan');
+            semYoung(d, p) = std(yVals, 'omitnan') / sqrt(sum(~isnan(yVals)));
+            dataYoung{d, p} = yVals;
+            % For old rats:
+            oVals = day_tbl{strcmp(day_tbl.Age, 'old'), colName};
+            meanOld(d, p) = mean(oVals, 'omitnan');
+            semOld(d, p) = std(oVals, 'omitnan') / sqrt(sum(~isnan(oVals)));
+            dataOld{d, p} = oVals;
+        end
+    end
+    
+    % Build grouped bar matrices: for each day, create 2*nPlat bars (odd: young, even: old)
+    meanMatrix = nan(nDays, 2*nPlat);
+    semMatrix = nan(nDays, 2*nPlat);
+    for p = 1:nPlat
+        meanMatrix(:, 2*p-1) = meanYoung(:, p);
+        meanMatrix(:, 2*p)   = meanOld(:, p);
+        semMatrix(:, 2*p-1) = semYoung(:, p);
+        semMatrix(:, 2*p)   = semOld(:, p);
+    end
+    
+    %-------------Plotting the Grouped Bar Chart with Sigstar
+    fH = figure('Name', stratTitle, 'Color', [1 1 1]);
+    sgtitle(stratTitle, 'FontSize', 14, 'FontWeight', 'bold');
+    hold on;
+    hBar = bar(meanMatrix, 'grouped');
+    set(gca, 'XTick', 1:nDays, 'XTickLabel', arrayfun(@num2str, uniqueDays, 'UniformOutput', false));
+    xlabel('Day'); ylabel('Mean Strategy Usage');
+    
+    % Assign colors: for each platform, young bars get youngShades; old bars get oldShades.
+    for p = 1:nPlat
+        colYoung = 2*p-1;
+        colOld = 2*p;
+        idx = min(p, size(youngShades,1));  % if nPlat > number of defined colors, use the last available color
+        hBar(colYoung).FaceColor = youngShades(idx, :);
+        hBar(colYoung).FaceAlpha = 0.75;
+        hBar(colOld).FaceColor = oldShades(idx, :);
+        hBar(colOld).FaceAlpha = 0.75;
+    end
+    
+    
+    % Add error bars.
+    drawnow; % ensure bar positions are updated
+    for c = 1:size(meanMatrix,2)
+        xVals = hBar(c).XEndPoints;
+        yVals = meanMatrix(:, c);
+        eVals = semMatrix(:, c);
+        errorbar(xVals, yVals, eVals, 'k', 'LineStyle', 'none', 'LineWidth', 1.2);
+    end
+    
+    % Add scatter points (jittered) for individual rat values.
+    jitterAmount = 0.05;
+    for d = 1:nDays
+        for c = 1:2*nPlat
+            if mod(c,2)==1
+                pIdx = ceil(c/2);
+                pts = dataYoung{d, pIdx};
+            else
+                pIdx = ceil(c/2);
+                pts = dataOld{d, pIdx};
+            end
+            if isempty(pts)
+                continue;
+            end
+            xCenter = hBar(c).XEndPoints(d);
+            xJitter = xCenter + (rand(size(pts))-0.5)*jitterAmount;
+            scatter(xJitter, pts, 12, 'MarkerFaceColor', hBar(c).FaceColor, 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 1);
+        end
+    end
+    
+    % Add significance markers using sigstar.
+    % Here we assume that the post hoc results (all_tukey) contain fields that indicate which platforms are compared.
+    % For example, assume they have fields 'Platform1' and 'Platform2' (as indices 1:nPlat),
+    % a field 'pValue', and a field 'Age' indicating 'young', 'old', or 'both'.
+    sigPairs_all = {};
+    sigPvals_all = [];
+    sigColors_all = {};
+    for iRow = 1:height(all_tukey)
+        day_val = all_tukey.Day(iRow);
+        % Find the day index:
+        dayIdx = find(uniqueDays == day_val);
+        if isempty(dayIdx)
+            continue;
+        end
+        % Use the fields 'Platform1' and 'Platform2' 
+        p1 = all_tukey.Platform_1(iRow);  
+        p2 = all_tukey.Platform_2(iRow);
+        pVal = all_tukey.pValue(iRow);
+        if pVal >= 0.05
+            continue;
+        end
+        compAge = all_tukey.Age{iRow};  % expected 'young', 'old', or 'both'
+        if strcmpi(compAge, 'young')
+            x1 = hBar(2*p1-1).XEndPoints(dayIdx);
+            x2 = hBar(2*p2-1).XEndPoints(dayIdx);
+            sigColor = clrYoungSig;
+        elseif strcmpi(compAge, 'old')
+            x1 = hBar(2*p1).XEndPoints(dayIdx);
+            x2 = hBar(2*p2).XEndPoints(dayIdx);
+            sigColor = clrOldSig;
+        else
+            x_candidates = [hBar(2*p1-1).XEndPoints(dayIdx), hBar(2*p1).XEndPoints(dayIdx), ...
+                            hBar(2*p2-1).XEndPoints(dayIdx), hBar(2*p2).XEndPoints(dayIdx)];
+            x1 = min(x_candidates);
+            x2 = max(x_candidates);
+            sigColor = clrBothSig;
+        end
+        sigPairs_all{end+1} = [x1, x2];
+        sigPvals_all(end+1) = pVal;
+        sigColors_all{end+1} = sigColor;
+    end
+    if ~isempty(sigPairs_all)
+        hS = sigstar(sigPairs_all, sigPvals_all);
+        for k = 1:size(hS,1)
+            set(hS(k), 'Color', sigColors_all{k});
+        end
+    end
+    
+    hold off;
+    %Legend
+    % legend_labels = cell(1, 2*nPlat);
+    % for p = 1:nPlat
+    %     legend_labels{2*p-1} = sprintf('P%d - Young', uniquePlatforms(p));
+    %     legend_labels{2*p}   = sprintf('P%d - Old', uniquePlatforms(p));
+    % end
+    % legend(hBar, legend_labels, 'Location', 'bestoutside');
+    pubify_figure_axis_robust(14,14);
+    % Save the figure
+    saveas(fH, fullfile(fig_dir, sprintf('3Platform_%s.png', stratTitle)));
+    close(fH);
+end
+
+
+
+%% 7) Group Strategy x Platform Group
+strategyGroups = {
+    {'thigmotaxis', 'circling', 'random_path'}, 'Non-Goal Oriented'; 
+    {'scanning', 'chaining'}, 'Procedural'; 
+    {'directed_search', 'corrected_search', 'direct_path','perseverance'}, 'Allocentric'
+};
+groupNames = strategyGroups(:, 2);  % Extract group labels
+nGroups = numel(groupNames);
+
+groupStrat = cell(1, nGroups);
+% Extract unique days (already defined), unique rats, and unique platforms.
+% uniqueDays = unique(data1.Day);
+% uniqueRats = unique(data1.x_TargetID);
+% uniquePlatforms = unique(data1.pd);
+
+% Loop over each strategy group to compute the aggregated group probability
+for g = 1:nGroups
+    currentStrategies = strategyGroups{g,1};
+    % Start with the first strategy's probability
+    groupProb = data1.(currentStrategies{1});
+    % Sum probabilities across all strategies in the group
+    for ii = 2:numel(currentStrategies)
+        groupProb = groupProb + data1.(currentStrategies{ii});
+    end
+    groupStrat{g} = groupProb;
+    groupTitle=groupNames{g};
+    %---------------------- Build Master Table per Group ----------------------%
+    % For each group, create a master table where each row = {RatID, Age, Day, P1, P2, ..., Pn}
+    nPlat = numel(uniquePlatforms);
+    master_data = {};
+    for d = 1:numel(uniqueDays)
+        dVal = uniqueDays(d);
+        % Subset data1 for the current day
+        dayData = data1(data1.Day == dVal, :);
+        % Get the corresponding aggregated group probabilities for the current day.
+        % (Assumes data1 rows remain in the same order.)
+        groupProbDay = groupStrat{g}(data1.Day == dVal);
+        for r = 1:numel(uniqueRats)
+            ratID = uniqueRats{r};
+            isCurrentRat = strcmp(dayData.x_TargetID, ratID);
+            if ~any(isCurrentRat)
+                continue; % This rat is not present on the current day
+            end
+            % Get the rat's Age (assumed constant)
+            ratAge = unique(dayData.Age(isCurrentRat));
+            if iscell(ratAge)
+                ratAge = ratAge{1};
+            end
+            % For each platform, compute the mean aggregated probability for that rat on the day.
+            meanUse = nan(1, nPlat);
+            for p = 1:nPlat
+                pVal = uniquePlatforms(p);
+                idx = isCurrentRat & (dayData.pd == pVal);
+                if any(idx)
+                    meanUse(p) = mean(groupProbDay(idx));
+                end
+            end
+            % Create a row: {RatID, Age, Day, P1, P2, ..., PnPlat}
+            row = {ratID, ratAge, dVal};
+            for p = 1:nPlat
+                row = [row, {meanUse(p)}];
+            end
+            master_data(end+1,:) = row;
+        end
+    end
+    
+    % Build variable names: fixed columns and then one per platform
+    measureVars = arrayfun(@(x) sprintf('P%d', x), uniquePlatforms, 'UniformOutput', false);
+    measureVars = measureVars(:)';  % force row vector
+    varNames = [{'RatID','Age','Day'}, measureVars];
+    master_table = cell2table(master_data, 'VariableNames', varNames);
+    
+    
+    %------------ Run ANOVA & Tukey Post Hoc for each day and combine results
+    all_anova = table();
+    all_tukey = table();
+    for d = 1:numel(uniqueDays)
+        dVal = uniqueDays(d);
+        day_table = master_table(master_table.Day == dVal, :);
+        % Create a reduced table with only the between-subject variable and repeated measures
+        anova_tbl = day_table(:, [{'Age'}, measureVars]);
+        
+        % Run repeated measures ANOVA (within factor = Platform, between factor = Age)
+        anovaResults = runMixedANOVA(anova_tbl, measureVars, 'Platform');
+        postHocResults = runTukeyPostHocMixed(anova_tbl, measureVars, 'Platform');
+        
+        % Tag results with the current Day
+        anovaResults.Day = repmat(dVal, height(anovaResults), 1);
+        postHocResults.Day = repmat(dVal, height(postHocResults), 1);
+        % Remove row names to allow concatenation
+        anovaResults.Properties.RowNames = {};
+        postHocResults.Properties.RowNames = {};
+
+        all_anova = [all_anova; anovaResults];
+        all_tukey = [all_tukey; postHocResults];
+    end
+    
+    % Save the combined ANOVA & Tukey results for this group.
+    anovaFile = fullfile(fig_dir, sprintf('3%s_PlatformGroups_ANOVA.csv', groupTitle));
+    tukeyFile = fullfile(fig_dir, sprintf('3%s_PlatformGroups_Tukey.csv', groupTitle));
+    writetable(all_anova, anovaFile);
+    writetable(all_tukey, tukeyFile);
+    
+    %Compute summary statistics for plotting
+    % Compute means and SEMs for each Day, separately for young and old, for each platform.
+    nDays = numel(uniqueDays);
+    meanYoung = nan(nDays, nPlat);
+    semYoung = nan(nDays, nPlat);
+    meanOld = nan(nDays, nPlat);
+    semOld = nan(nDays, nPlat);
+    dataYoung = cell(nDays, nPlat);
+    dataOld   = cell(nDays, nPlat);
+    
+    for d = 1:nDays
+        dVal = uniqueDays(d);
+        day_tbl = master_table(master_table.Day == dVal, :);
+        for p = 1:nPlat
+            colName = measureVars{p};  % e.g., 'P1', 'P2', ...
+            % For young rats:
+            yVals = day_tbl{strcmp(day_tbl.Age, 'young'), colName};
+            meanYoung(d, p) = mean(yVals, 'omitnan');
+            semYoung(d, p) = std(yVals, 'omitnan')/sqrt(sum(~isnan(yVals)));
+            dataYoung{d, p} = yVals;
+            % For old rats:
+            oVals = day_tbl{strcmp(day_tbl.Age, 'old'), colName};
+            meanOld(d, p) = mean(oVals, 'omitnan');
+            semOld(d, p) = std(oVals, 'omitnan')/sqrt(sum(~isnan(oVals)));
+            dataOld{d, p} = oVals;
+        end
+    end
+    
+    % Create matrices for grouped bars.
+    % For each day, we create 2*nPlat bars (odd indices for young, even for old).
+    meanMatrix = nan(nDays, 2*nPlat);
+    semMatrix = nan(nDays, 2*nPlat);
+    for p = 1:nPlat
+        meanMatrix(:, 2*p-1) = meanYoung(:, p);
+        meanMatrix(:, 2*p)   = meanOld(:, p);
+        semMatrix(:, 2*p-1) = semYoung(:, p);
+        semMatrix(:, 2*p)   = semOld(:, p);
+    end
+    
+    %Plotting the Grouped Bar Chart with Sigstar
+    fH = figure('Name', groupTitle, 'Color', [1 1 1]);
+    sgtitle(groupTitle, 'FontSize', 14, 'FontWeight', 'bold');
+    ylim([0 1])
+    hold on;
+    hBar = bar(meanMatrix, 'grouped');
+    set(gca, 'XTick', 1:nDays, 'XTickLabel', arrayfun(@num2str, uniqueDays, 'UniformOutput', false));
+    xlabel('Day'); ylabel('Mean Aggregated Strategy Usage');
+    
+    % Assign colors for each platform: young bars get youngShades; old bars get oldShades.
+    for p = 1:nPlat
+        colYoung = 2*p-1;
+        colOld = 2*p;
+        idx = min(p, size(youngShades,1));
+        hBar(colYoung).FaceColor = youngShades(idx, :);
+        hBar(colYoung).FaceAlpha = 0.75;
+        hBar(colOld).FaceColor = oldShades(idx, :);
+        hBar(colOld).FaceAlpha = 0.75;
+    end
+    
+    % Add error bars.
+    drawnow;
+    for c = 1:size(meanMatrix,2)
+        xVals = hBar(c).XEndPoints;
+        yVals = meanMatrix(:, c);
+        eVals = semMatrix(:, c);
+        errorbar(xVals, yVals, eVals, 'k', 'LineStyle', 'none', 'LineWidth', 1.2);
+    end
+    
+    % Add scatter points (jittered) for individual rat values.
+    jitterAmount = 0.05;
+    for d = 1:nDays
+        for c = 1:2*nPlat
+            if mod(c,2)==1
+                pIdx = ceil(c/2);
+                pts = dataYoung{d, pIdx};
+            else
+                pIdx = ceil(c/2);
+                pts = dataOld{d, pIdx};
+            end
+            if isempty(pts), continue; end
+            xCenter = hBar(c).XEndPoints(d);
+            xJitter = xCenter + (rand(size(pts))-0.5)*jitterAmount;
+            scatter(xJitter, pts, 12, 'MarkerFaceColor', hBar(c).FaceColor, ...
+                'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 1);
+        end
+    end
+    
+    % Add significance markers using sigstar.
+    sigPairs_all = {};
+    sigPvals_all = [];
+    sigColors_all = {};
+    for iRow = 1:height(all_tukey)
+        day_val = all_tukey.Day(iRow);
+        % Find the day index:
+        dayIdx = find(uniqueDays == day_val);
+        if isempty(dayIdx)
+            continue;
+        end
+        % Here, we assume the fields 'Day_1' and 'Day_2' actually indicate Platform numbers.
+        p1 = all_tukey.Platform_1(iRow);  
+        p2 = all_tukey.Platform_2(iRow); 
+        pVal = all_tukey.pValue(iRow);
+        if pVal >= 0.05
+            continue;
+        end
+        % Determine which age group the comparison applies to.
+        compAge = all_tukey.Age{iRow};  % expected 'young', 'old', or 'both'
+        if strcmpi(compAge, 'young')
+            x1 = hBar(2*p1-1).XEndPoints(dayIdx);
+            x2 = hBar(2*p2-1).XEndPoints(dayIdx);
+            sigColor = clrYoungSig;
+        elseif strcmpi(compAge, 'old')
+            x1 = hBar(2*p1).XEndPoints(dayIdx);
+            x2 = hBar(2*p2).XEndPoints(dayIdx);
+            sigColor = clrOldSig;
+        else
+            x_candidates = [hBar(2*p1-1).XEndPoints(dayIdx), hBar(2*p1).XEndPoints(dayIdx), ...
+                            hBar(2*p2-1).XEndPoints(dayIdx), hBar(2*p2).XEndPoints(dayIdx)];
+            x1 = min(x_candidates);
+            x2 = max(x_candidates);
+            sigColor = clrBothSig;
+        end
+        sigPairs_all{end+1} = [x1, x2];
+        sigPvals_all(end+1) = pVal;
+        sigColors_all{end+1} = sigColor;
+    end
+    if ~isempty(sigPairs_all)
+        hS = sigstar(sigPairs_all, sigPvals_all);
+        for k = 1:size(hS,1)
+            set(hS(k), 'Color', sigColors_all{k});
+        end
+    end
+    
+    hold off;
+    % legend_labels = cell(1, 2*nPlat);
+    % for p = 1:nPlat
+    %     legend_labels{2*p-1} = sprintf('P%d - Young', uniquePlatforms(p));
+    %     legend_labels{2*p}   = sprintf('P%d - Old', uniquePlatforms(p));
+    % end
+    % legend(hBar, legend_labels, 'Location', 'bestoutside');
+    pubify_figure_axis_robust(14,14);
+    % Save the figure
+    saveas(fH, fullfile(fig_dir, sprintf('3Platform_%s.png', groupTitle)));
+    close(fH);
+end
 
 
 %% END) Plot Strategy by Trial - All - Very Messy 

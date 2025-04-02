@@ -7,12 +7,12 @@
 
 %% GET DATA
 % Parameters
-base_dir='D:\DATA\CognitiveBattery\WaterMaze\Mia_Proj';
-proc_dir=fullfile(base_dir, 'Processed')
+base_dir='G:\WMAZE_Data\Data_Behaviour\Data_CognitiveBattery\WaterMaze';
+proc_dir=fullfile(base_dir);
 % Mk dir 
-if ~exist(proc_dir, "dir")
-    mkdir(proc_dir);
-end
+% if ~exist(proc_dir, "dir")
+%     mkdir(proc_dir);
+% end
 
 % Get all .xlsx files in base_dir
 files = dir(fullfile(base_dir,'*.xlsx'));
@@ -66,8 +66,7 @@ for i = 1:numel(files)
     
     %=== Read "Probe" sheet
     pbT = readtable(fname,'Sheet','Probe','VariableNamesRange',1);
-    pbCols = {'Animal','Duration','Distance','Q1_Time','Platform_Entries',...
-        'Platform_PathEfficiencyToEntry','Platform_CIPL'};
+    pbCols = {'Animal','Duration','Distance','Q1_Time','Platform_Entries','Platform_CIPL'};
     pbKeep = intersect(pbCols, pbT.Properties.VariableNames);
     pbT = pbT(:,pbKeep);%--- For each row in the Key table, fill the matching Animal's Age
     for k = 1:height(keyT)

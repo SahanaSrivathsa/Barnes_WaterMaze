@@ -1,24 +1,31 @@
-function postHocResults = runTukeyPostHocMixed(tbl, measureVars)
-% runTukeyPostHocMixed runs Tukeys post-hoc pairwise comparisons on the 
-% Day factor within each Age group for a mixed-design repeated measures ANOVA.
-% Originally designed for WaterMaze and W maze data
+function postHocResults = runTukeyPostHocMixed(tbl, measureVars, factorVar)
+% runTukeyPostHocMixed runs Tukey's post-hoc pairwise comparisons on the 
+% within-subject factor (default 'Day') within each Age group for a 
+% mixed-design repeated measures ANOVA.
 %
-%
-% Create the within-subject factor table and fit the repmeasures model with Age as a between-subject factor.
-%Use multcompareto run Tukey comparisons among Day levels for each Age group.
+% Create the within-subject factor table and fit the repeated measures model
+% with Age as a between-subject factor. Use multcompare to run Tukey comparisons 
+% among levels of the within-subject factor.
 %
 % INPUTS:
-%   tbl         - Table with one row per subject.Group here is 'Age' 
-%               and repeated measures variables- here is day
-%   measureVars - Cell array of strings naming the repeated measures,
-%                   here day1, day2, day 3 etc
+%   tbl         - Table with one row per subject. Must include a column 'Age'
+%                 (the group) and repeated measures variables (e.g., day1, day2, day3, etc.)
+%   measureVars - Cell array of strings naming the repeated measures.
+%                 e.g., {'Day1', 'Day2', 'Day3', ...}
+%   factorVar   - (Optional) String naming the within-subject factor. Default is 'Day'.
+%
 % OUTPUT:
 %   postHocResults - The results of the Tukey post hoc tests.
+%
 % SS 2025
- 
+
+if nargin < 3
+    factorVar = 'Day';
+end
+
 numLevels = numel(measureVars);
-withinDesign = table((1:numLevels)', 'VariableNames', {'Day'});
+withinDesign = table((1:numLevels)', 'VariableNames', {factorVar});
 formula = sprintf('%s-%s ~ Age', measureVars{1}, measureVars{end});
 rm = fitrm(tbl, formula, 'WithinDesign', withinDesign);
-postHocResults = multcompare(rm, 'Day', 'By', 'Age', 'ComparisonType', 'tukey-kramer');
+postHocResults = multcompare(rm, factorVar, 'By', 'Age', 'ComparisonType', 'tukey-kramer');
 end
