@@ -1,4 +1,5 @@
 library(openxlsx)
+library(readxl)
 
 rtrack_folder <- "/Users/miasponseller/Desktop/Lab/Rtrack" # folder with all data for Rtrack
 all_rats_desc_fp <- file.path("/Users/miasponseller/Desktop/Lab/Rtrack/All_Rats.xlsx") # all rats experiment description file, must be an .xlsx
