@@ -1,2 +1,0 @@
-# Download example dataset into the current directory
-download.file("https://rupertoverall.net/Rtrack/example_data.zip", "/Users/miasponseller/Desktop/example_data.zip")

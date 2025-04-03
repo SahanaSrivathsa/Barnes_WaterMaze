@@ -256,7 +256,7 @@ prob_means <- function(fp) {
 # Run Functions -----------------------------------------------------------
 #strat_counts(fp)
 #strat_hist(strat_counts(fp))
-strat_bar_chart(strat_counts(fp))
+#strat_bar_chart(strat_counts(fp))
 #strats_all_days_ages(strat_counts(fp))
 #by_type(strat_counts(fp))
 
