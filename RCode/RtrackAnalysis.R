@@ -18,7 +18,7 @@ cohort_file_paths <- sapply(cohort_list, function(cohort) {
   USE.NAMES = FALSE)
 
 # all rats experiment description file (if exists)
-all_rats_desc_fp <- file.path(rtrack_folder, "/All_Rats.xlsx")
+all_rats_desc_fp <- file.path(rtrack_folder, "All_Rats.xlsx")
 
 
 # Add to or create All Rats file ------------------------------------------
@@ -27,7 +27,7 @@ all_rats_experiment_desc_file <- function(cohort_list, cohort_file_paths, rat_li
   all_rats_fp <- file.path(rtrack_folder, "All_Rats.xlsx") # output file path
   all_rats <- data.frame()
   
-  # Ensure that the cohort list and cohort file paths are the same length
+  # Ensure cohort list and cohort file paths are the same length
   if (length(cohort_list) != length(cohort_file_paths)) {
     stop("The cohort list and cohort file paths are not the same length.")
   }
@@ -385,9 +385,6 @@ strat_export <- function() {
 }
 
 
-# note: separate to diff code
-
-
 
 # Run Functions ------------------------------------------------------------
 
@@ -400,7 +397,7 @@ strat_export <- function() {
 #strategy_plots()
 #selected_metrics_plot()
 #bulk_density_map()
-strat_export()
+#strat_export()
 
 
 
