@@ -2,12 +2,12 @@ library(openxlsx)
 library(readxl)
 library(Rtrack)
 
-rtrack_folder <- "/Users/miasponseller/Desktop/Lab/Rtrack" # folder with all data for Rtrack
+rtrack_folder <- "/Users/miasponseller/Desktop/Lab/Rtrack" # Rtrack folder file path (main directory)
 all_rats_desc_fp <- file.path("/Users/miasponseller/Desktop/Lab/Rtrack/All_Rats.xlsx") # all rats experiment description file, must be an .xlsx
 trials_dir <- "/Users/miasponseller/Desktop/Lab/Rtrack/All Trials" # folder with all trials path data
 strat_export_fp <- paste0("/Users/miasponseller/Desktop/Lab/Rtrack/MWM_results_", format(Sys.Date(), "%m-%d-%Y"), ".xlsx") # output file path
 
-cohort_list <- c(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+cohort_list <- c(1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
 
 
 bulk_strategy_calling <- function() {
@@ -32,7 +32,7 @@ strat_export <- function() {
   #Rtrack::export_results(experiment, strategies, tracks = rownames(thresholded$calls), file = strat_export_fp)
   
   
-  # rename numbered strat columns to match their strat name
+  # rename numbered strategy columns to match their strategy name
   mwm_results <- read_xlsx(strat_export_fp)  # Read the MWM results file to confirm
   mwm_results <- mwm_results %>%
     rename(
