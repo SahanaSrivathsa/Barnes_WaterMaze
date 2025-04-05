@@ -4,40 +4,13 @@ processed_dir=fullfile(base_dir,'StrategyProcessed');
 fig_dir=fullfile(base_dir,'Figures');
 
 %Load data from Excel files
-data1 = readtable(fullfile(base_dir,'MWM_results.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
+data1 = readtable(fullfile(base_dir,'MWM_results_04-04-2025.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
 data2 = readtable(fullfile(base_dir,'AllMorrisWaterMazeData_Spatial.csv'));  % From Matlab Analysis contains Test_No, Cohort, Platform_CIPL
 % Analysis Parameters that are constant - mostly colours for groups
 grpList = ["Young","Old"];
-clrMap  = {[0 0.6 0],[0.5 0 0.5]}; % green, purple
-
-%------- Initialize Vectors for CIPL Scores and Strategy Probs -------%
-
-N = height(data1);
-platformScores = zeros(N,1);
-
-% Loop over each row in Strategy Data to find corresponding CIPL from
-% second data set
-for i = 1:N
-    % Get Track ID which has cohort number and trial no.
-    tID = data1.Track_ID{i};
-    % Use regexp to extract numeric parts: cohort and test number
-    tokens = regexp(tID, 'Coh(\d+)_test(\d+)', 'tokens');
-    if ~isempty(tokens)
-        token = tokens{1};
-        cohortNum = str2double(token{1});
-        testNum = str2double(token{2});
-        % Find the matching row in data2 using cohort and test numbers
-        idx = find(data2.Cohort == cohortNum & data2.Test == testNum, 1);
-        if ~isempty(idx)
-            platformScores(i) = data2.Platform_CIPL(idx);
-        else
-            platformScores(i) = NaN;
-        end
-    else
-        platformScores(i) = NaN;
-    end
-end
-
+clrMap  = {[0.2196,0.5569,0.2353],[0.4157,0.1059,0.6039]}; % green, purple
+% oldColor=[0.4157,0.1059,0.6039];
+% youngColor=[0.2196,0.5569,0.2353];
 % Define the strategy column names (adjust names if needed)
 strategyNames = {'thigmotaxis','circling','random_path','scanning',...
     'chaining','directed_search','corrected_search','direct_path','perseverance'};
@@ -45,8 +18,6 @@ nStrategies = numel(strategyNames);
 
 strategy_titles={'Thigmotaxis','Circling','Random Path','Scanning',...
     'Chaining','Directed Search','Corrected Search','Direct Path','Perseverance'};
-%% Change platform groups -test
-data1.pd(data1.pd==4)=3;
 
 %% CHECK FOR CONSISTENCY in datasets (Trial no and full values)
 
@@ -93,14 +64,135 @@ commonAnimals = intersect(unique(data1.x_TargetID), unique(string(data2.Animal))
 data1 = data1(ismember(data1.x_TargetID, commonAnimals), :);
 data2 = data2(ismember(string(data2.Animal), commonAnimals), :);
 
+% Get Platform Scores for CIPL - make sure the trial numbers align
+platformScores = zeros(height(data2),1);
 
+% Loop over each row in Strategy Data to find corresponding CIPL from
+% second data set
+for i = 1:height(data1)
+    %Get Track ID which has cohort number and trial no.
+    tID = data1.Track_ID{i};
+   % Use regexp to extract numeric parts: cohort and test number
+    tokens = regexp(tID, 'Coh(\d+)_test(\d+)', 'tokens');
+    if ~isempty(tokens)
+        token = tokens{1};
+        cohortNum = str2double(token{1});
+        testNum = str2double(token{2});
+        % Find the matching row in data2 using cohort and test numbers
+        idx = find(data2.Cohort == cohortNum & data2.Test == testNum, 1);
+        idx2=find(data2.Animal==str2double(data1.x_TargetID{i}) &...
+            data2.Trial == data1.x_Trial(i));
+        if(idx~=idx2)
+           platformScores(i)=NaN;
+        elseif ~isempty(idx)
+            platformScores(i) = data2.Platform_CIPL(idx);
+        else
+            platformScores(i)=NaN;
+        end
+    end
+end
+% Remove all the values where platform scores are nan
+% Identify valid rows (non-NaN platform scores)
+validIdx = ~isnan(platformScores);
+
+% Filter data1 accordingly
+data1 = data1(validIdx, :);
+platformScores = platformScores(validIdx);  % also update platformScores to match
+
+% Get corresponding animal-trial combinations from filtered data1
+validAnimals = str2double(data1.x_TargetID);
+validTrials = data1.x_Trial;
+
+% Use these to find matching rows in data2
+keepIdx = false(height(data2), 1);
+for i = 1:length(validAnimals)
+    match = data2.Animal == validAnimals(i) & data2.Trial == validTrials(i);
+    if any(match)
+        keepIdx = keepIdx | match;
+    end
+end
+
+% Filter data2 to keep only matching animal-trial rows
+data2 = data2(keepIdx, :);
+%platformScores(platformScores<=0)=0;
 %% 1) CIPL-Strategy  Plots- All trials
-polyOrder = 3;  % CHANGE if needed based on fit - 1,-linear, 2- quadratic and 3- cubic.
+polyOrder = 2;  % Change as needed
 
 for s = 1:nStrategies
-    
     % Extract the probability vector for the current strategy
     stratProb = data1.(strategyNames{s});
+
+    % Separate indices for young and old groups
+    isYoung = strcmp(data1.Age, 'young');
+    isOld   = strcmp(data1.Age, 'old');
+
+    % All data (for scatter)
+    x_young = platformScores(isYoung);
+    y_young = stratProb(isYoung);
+    x_old   = platformScores(isOld);
+    y_old   = stratProb(isOld);
+
+    % Filter out non-positive x values for polynomial fitting only
+    x_young_fit = x_young(x_young > 0);
+    y_young_fit = y_young(x_young > 0);
+    x_old_fit   = x_old(x_old > 0);
+    y_old_fit   = y_old(x_old > 0);
+
+    f = figure; hold on;
+
+    % Scatter plot (including zero values)
+    scatter(x_young_fit, y_young_fit, 20, clrMap{1}, 'filled',...
+        'MarkerFaceAlpha', 0.5, 'DisplayName', 'YOUNG');
+    scatter(x_old_fit,   y_old_fit,   20, clrMap{2}, 'filled',...
+        'MarkerFaceAlpha', 0.5, 'DisplayName', 'OLD');
+
+    % % --- Polynomial Fit: Young group ---
+    % if ~isempty(x_young_fit)
+    %     pY = polyfit(x_young_fit, y_young_fit, polyOrder);
+    %     xFit_y = linspace(min(x_young_fit), max(x_young_fit), 100);
+    %     yFit_y = polyval(pY, xFit_y);
+    %     plot(xFit_y, yFit_y, 'Color', clrMap{1}, 'LineWidth', 2, 'DisplayName', 'YOUNG');
+    % end
+    % 
+    % % --- Polynomial Fit: Old group ---
+    % if ~isempty(x_old_fit)
+    %     pO = polyfit(x_old_fit, y_old_fit, polyOrder);
+    %     xFit_o = linspace(min(x_old_fit), max(x_old_fit), 100);
+    %     yFit_o = polyval(pO, xFit_o);
+    %     plot(xFit_o, yFit_o, 'Color', clrMap{2}, 'LineWidth', 3, 'DisplayName', 'OLD');
+    % end
+
+    title(sprintf('%s: CIPL', strategy_titles{s}));
+        
+    xlabel('CIPL Score (m.s)');
+    ylabel('Probability of Strategy Use');
+    legend('show'); 
+    xlim([0 60]); 
+    ylim([0 1]);
+    pubify_figure_axis_robust(14, 14);
+    hold off;
+
+    saveas(f, fullfile(fig_dir, 'CIPL_Strategy', sprintf('CIPL_%s', strategyNames{s})), 'png');
+end
+
+%% 2) CIPL vs group Probabilities
+polyOrder = 2;  % CHANGE if needed based on fit - 1,-linear, 2- quadratic and 3- cubic.
+strategyGroups = {
+    {'thigmotaxis', 'circling', 'random_path'}, 'Non-Goal Oriented'; 
+    {'scanning', 'chaining'}, 'Procedural'; 
+    {'directed_search', 'corrected_search', 'direct_path','perseverance'}, 'Allocentric'
+};
+groupNames = strategyGroups(:, 2);  % Extract group labels
+for s = 1:numel(groupNames)
+     % Get the strategies in the current group
+    currentStrategies = strategyGroups{s, 1};
+    groupProb=data1.(currentStrategies{1});
+    for ii=2:numel(currentStrategies)
+        groupProb=groupProb+data1.(currentStrategies{ii});
+    end
+
+    % Extract the probability vector for the current strategy
+    stratProb = groupProb;
     
     % Separate indices for young and old groups based on the Age column
     isYoung = strcmp(data1.Age, 'young');
@@ -120,62 +212,64 @@ for s = 1:nStrategies
     hold on;
 
     % Scatter plot (only scatter handles used in the legend)
-    scatter(x_young, y_young, 20, clrMap{1}, 'filled','MarkerFaceAlpha',0.5);
-    scatter(x_old, y_old, 20, clrMap{2}, 'filled','MarkerFaceAlpha',0.5);
+    scatter(x_young, y_young, 20, clrMap{1}, 'filled',...
+        'MarkerFaceAlpha',0.5, 'DisplayName', 'YOUNG');
+    scatter(x_old, y_old, 20, clrMap{2}, 'filled',...
+        'MarkerFaceAlpha',0.5, 'DisplayName', 'OLD');
 
-    % NEW FIT
-   % Fit a polynomial of specified order
-    p_young = polyfit(x_young, y_young, polyOrder);
-    % Generate fitted curve
-    xFit_y = linspace(min(x_young), max(x_young), 100);
-    yFit_y = polyval(p_young, xFit_y);
-    h1 =plot(xFit_y, yFit_y, 'Color', clrMap{1}, 'LineWidth', 2,'DisplayName','YOUNG');
-    
-    % Compute R^2 for the young fit
-    yHat_young = polyval(p_young, x_young);
-    SSE_y = sum((y_young - yHat_young).^2);                 
-    SST_y = sum((y_young - mean(y_young)).^2);            
-    R2_young = 1 - SSE_y / SST_y;                          
-    r_young = sqrt(max(R2_young, 0));  % effective correlation from r^2
-
-    %Old fit
-    p_old = polyfit(x_old, y_old, polyOrder);
-    % Generate fitted curve
-    xFit_o = linspace(min(x_old), max(x_old), 100);
-    yFit_o = polyval(p_old, xFit_o);
-    h2 =plot(xFit_o, yFit_o, 'Color', clrMap{2}, 'LineWidth', 3,'DisplayName','OLD');
-    
-    % Compute r^2 for the old fit
-    yHat_old = polyval(p_old, x_old);
-    SSE_o = sum((y_old - yHat_old).^2);
-    SST_o = sum((y_old - mean(y_old)).^2);
-    R2_old = 1 - SSE_o / SST_o;
-    r_old = sqrt(max(R2_old, 0)); 
-   
-     % Fishers z transformation to compare correlation coefficients 
-    z_young = atanh(r_young);
-    z_old = atanh(r_old);
-    % For large-sample approximation, use n - polyOrder - 1
-    se_diff = sqrt(1/(n_young - 1) + 1/(n_old - 1));
-    z_stat  = (z_young - z_old) / se_diff;
-    p_value = 2 * (1 - normcdf(abs(z_stat)));
+   %  % NEW FIT
+   % % Fit a polynomial of specified order
+   %  p_young = polyfit(x_young, y_young, polyOrder);
+   %  % Generate fitted curve
+   %  xFit_y = linspace(min(x_young), max(x_young), 100);
+   %  yFit_y = polyval(p_young, xFit_y);
+   %  h1 =plot(xFit_y, yFit_y, 'Color', clrMap{1}, 'LineWidth', 2,'DisplayName','YOUNG');
+   % 
+   %  % Compute R^2 for the young fit
+   %  yHat_young = polyval(p_young, x_young);
+   %  SSE_y = sum((y_young - yHat_young).^2);                 
+   %  SST_y = sum((y_young - mean(y_young)).^2);            
+   %  R2_young = 1 - SSE_y / SST_y;                          
+   %  r_young = sqrt(max(R2_young, 0));  % effective correlation from r^2
+   % 
+   %  %Old fit
+   %  p_old = polyfit(x_old, y_old, polyOrder);
+   %  % Generate fitted curve
+   %  xFit_o = linspace(min(x_old), max(x_old), 100);
+   %  yFit_o = polyval(p_old, xFit_o);
+   %  h2 =plot(xFit_o, yFit_o, 'Color', clrMap{2}, 'LineWidth', 3,'DisplayName','OLD');
+   % 
+   %  % Compute r^2 for the old fit
+   %  yHat_old = polyval(p_old, x_old);
+   %  SSE_o = sum((y_old - yHat_old).^2);
+   %  SST_o = sum((y_old - mean(y_old)).^2);
+   %  R2_old = 1 - SSE_o / SST_o;
+   %  r_old = sqrt(max(R2_old, 0)); 
+   % 
+   %   % Fishers z transformation to compare correlation coefficients 
+   %  z_young = atanh(r_young);
+   %  z_old = atanh(r_old);
+   %  % For large-sample approximation, use n - polyOrder - 1
+   %  se_diff = sqrt(1/(n_young - 1) + 1/(n_old - 1));
+   %  z_stat  = (z_young - z_old) / se_diff;
+   %  p_value = 2 * (1 - normcdf(abs(z_stat)));
     
     % Title with correlation coefficients
-    title(sprintf('%s: Young r=%.2f, Old r=%.2f p=%.3f', strategy_titles{s},...
-        r_young, r_old,p_value),'FontSize',18,'FontWeight','bold');
+    % title(sprintf('%s: Young r=%.2f, Old r=%.2f p=%.3f', groupNames{s},...
+    %     r_young, r_old,p_value),'FontSize',18,'FontWeight','bold');
+    title(sprintf('%s', groupNames{s}),'FontSize',18,'FontWeight','bold');
     xlabel('CIPL Score (m.s)','FontSize',14,'FontWeight','bold');
     ylabel('Probability','FontSize',14,'FontWeight','bold');
-    legend([h1,h2],FontSize=12);
+    legend('show');
     xlim([0 60]);
-    ylim([0 0.8]);
+    ylim([0 1]);
     pubify_figure_axis_robust(14,14)
     hold off;
     % Save figure
-    saveas(f, fullfile(fig_dir,sprintf('CIPL_%s_quadratic',strategyNames{s})),'png');
+     saveas(f, fullfile(fig_dir, 'CIPL_Strategy', sprintf('CIPL_%s',groupNames{s})),'png');
 end
 
-
-%% 2) Strategy-Day Plots (individual and group)
+%% 3) Strategy-Day Plots (individual and group)
 for s = 1:nStrategies
     %-------------- Individual Rat Plot --------------%
     stratProb = data1.(strategyNames{s});
@@ -269,7 +363,7 @@ for s = 1:nStrategies
     pubify_figure_axis_robust(14,14);
     hold off;
     % Save fig
-    saveas(f1, fullfile(fig_dir, sprintf('IndividualRats_%s', strategyNames{s})), 'png');
+    saveas(f1, fullfile(fig_dir,'StrategyUse', sprintf('IndividualRats_%s', strategyNames{s})), 'png');
     close;
     
     % Convert cell array to table for ANOVA and post hoc tests
@@ -305,14 +399,14 @@ for s = 1:nStrategies
    
     xlabel('Day');
     ylabel('Probability of Strategy Use');
-    legend({'Young', 'Old'}, 'Location', 'Northeast');
+    %legend({'Young', 'Old'}, 'Location', 'Northeast');
     ylim([0 0.75]);
     pubify_figure_axis_robust(14,14);
     hold off;
     
     
     % Save the overall bar plot
-    saveas(f2, fullfile(fig_dir, sprintf('%s_AllTrials', strategyNames{s})), 'png');
+    saveas(f2, fullfile(fig_dir, 'StrategyUse',sprintf('ALLTRIALS_%s', strategyNames{s})), 'png');
     close;
     %Figure for mean of each trial per day
     dataMeanYoung = cell(numel(uniqueDays), 1);
@@ -334,18 +428,18 @@ for s = 1:nStrategies
     title(sprintf('%s: Rat Mean Per Day',strategy_titles{s}),'FontSize',16);
     xlabel('Day');
     ylabel('Probability of Strategy Use');
-    legend({'Young', 'Old'}, 'Location', 'Northeast');
+    %legend({'Young', 'Old'}, 'Location', 'Northeast');
     ylim([0 0.75]);
     pubify_figure_axis_robust(14,14);
     hold off;
     
     % Save the overall bar plot
-    saveas(f3, fullfile(fig_dir, sprintf('%s_RatMeanPerDay', strategyNames{s})), 'png');
+    saveas(f3, fullfile(fig_dir, 'StrategyUse',sprintf('RatMeanPerDay_%s', strategyNames{s})), 'png');
     close
 end
 
 
-%% 3) Strategy by Group - Non-spatial/Procedural/Allocentric 
+%% 4) Strategy by Group - Non-spatial/Procedural/Allocentric 
 % Define strategy groups and their names
 strategyGroups = {
     {'thigmotaxis', 'circling', 'random_path'}, 'Non-Goal Oriented';
@@ -448,14 +542,14 @@ for g = 1:nGroups
     xlabel('Day');
     ylabel('Probability of Strategy Use');
     xticks(uniqueDays);
-    legend('Location', 'Northeast');
+    legend('Location', 'northeastoutside');
     ylim([0 1]);
     xlim([0.75 4.25]);
     pubify_figure_axis_robust(14, 14);
     hold off;
 
     % Save individual rat plot
-    saveas(f1, fullfile(fig_dir, sprintf('IndividualRats_%s', groupNames{g})), 'png');
+    saveas(f1, fullfile(fig_dir, 'StrategyUse',sprintf('IndividualRats_%s', groupNames{g})), 'png');
     close;
 
     % Convert cell array to table for ANOVA and post hoc tests
@@ -483,23 +577,23 @@ for g = 1:nGroups
     dataYoung = arrayfun(@(d) groupProb(isYoung & (data1.Day == d)), uniqueDays, 'UniformOutput', false);
     dataOld   = arrayfun(@(d) groupProb(isOld & (data1.Day == d)), uniqueDays, 'UniformOutput', false);
     
-    % Create bar plot using the separate function plot_bar_sem
-    f2 = figure;
-    plot_bar_sem_WaterMaze(uniqueDays, meanYoung, semYoung, meanOld, semOld,...
-        dataYoung, dataOld, postHocResults);
-    %PlotParams
-    title(sprintf('%s: All Trials',groupNames{g}),'FontSize',16);
-   
-    xlabel('Day');
-    ylabel('Probability of Strategy Use');
-    legend({'Young', 'Old'}, 'Location', 'best');
-    ylim([0 1.35]);
-    pubify_figure_axis_robust(14,14);
-    hold off;
-
-     % Save fig
-    saveas(f2, fullfile(fig_dir, sprintf('%s_AllTrials', groupNames{g})), 'png');
-    close;
+    % % Create bar plot using the separate function plot_bar_sem
+    % f2 = figure;
+    % plot_bar_sem_WaterMaze(uniqueDays, meanYoung, semYoung, meanOld, semOld,...
+    %     dataYoung, dataOld, postHocResults);
+    % %PlotParams
+    % title(sprintf('%s: All Trials',groupNames{g}),'FontSize',16);
+    % 
+    % xlabel('Day');
+    % ylabel('Probability of Strategy Use');
+    % %legend({'Young', 'Old'}, 'Location', 'northeastoutside');
+    % ylim([0 1.35]);
+    % pubify_figure_axis_robust(14,14);
+    % hold off;
+    % 
+    %  % Save fig
+    % saveas(f2, fullfile(fig_dir, sprintf('%s_AllTrials', groupNames{g})), 'png');
+    % close;
 
     %-------------- Figure for Mean Per Rat Per Day --------------%
     
@@ -524,13 +618,13 @@ for g = 1:nGroups
     title(sprintf('%s: Rat Mean Per Day', groupNames{g}), 'FontSize', 16);
     xlabel('Day');
     ylabel('Probability of Strategy Use');
-    legend({'Young', 'Old'}, 'Location', 'best');
+    %legend({'Young', 'Old'}, 'Location', 'northeastoutside');
     ylim([0 1.25]);
     pubify_figure_axis_robust(14, 14);
     hold off;
 
     % Save the overall bar plot for mean per rat per day
-    saveas(f3, fullfile(fig_dir, sprintf('%s_RatMeanPerDay', groupNames{g})), 'png');
+    saveas(f3, fullfile(fig_dir, 'StrategyUse',sprintf('RatMeanPerDay_%s', groupNames{g})), 'png');
     close;
 end
 
@@ -538,10 +632,9 @@ end
 
 
 
-%% 4) Entropy Calculation
-
-youngColor = [0 0.6 0];    
-oldColor   = [0.5 0 0.5];  
+%% 5) Entropy Calculation
+ oldColor=[0.4157,0.1059,0.6039]; %green
+ youngColor=[0.2196,0.5569,0.2353];% purple 
 
 %------------------ Compute Entropy for Each Trial ------------------%
 % Entropy formula: H = -sum(p .* log2(p + eps))
@@ -614,7 +707,7 @@ ylabel('Entropy');
 title('Entropy: All Trials and All Rats');
 pubify_figure_axis_robust(14,14);
 hold off;
-saveas(fe1, fullfile(fig_dir, 'EntropyAllTrials'), 'png');
+saveas(fe1, fullfile(fig_dir,  'Entropy','EntropyAllTrials'), 'png');
 close;
 
 
@@ -624,8 +717,8 @@ uniqueAges = {'young','old'};
 
 
 % For each day and each age group, compute the group mean and SEM from the per-rat means.
-meanEntropy = zeros(numel(uniqueDays), nAges);
-semEntropy = zeros(numel(uniqueDays), nAges);
+meanEntropy = zeros(numel(uniqueDays), numel(uniqueAges));
+semEntropy = zeros(numel(uniqueDays), numel(uniqueAges));
 % Also build cell arrays holding the per-rat means for each day (for scatter overlay)
 dataEntropyYoung = cell(numel(uniqueDays),1);
 dataEntropyOld   = cell(numel(uniqueDays),1);
@@ -652,23 +745,23 @@ fe2=figure;
 hold on;
 plot_bar_sem_WaterMaze(uniqueDays, meanEntropy(:,1), semEntropy(:,1), ...
     meanEntropy(:,2), semEntropy(:,2), dataEntropyYoung, dataEntropyOld, postHocResults);
-title('Mean Entropy (Rats Day Means)');
+title('Mean Entropy ');
 xlabel('Day');
 ylabel('Entropy');
 pubify_figure_axis_robust(14,14);
 xticks(uniqueDays);
 hold off;
-saveas(fe2, fullfile(fig_dir, 'Entropy_MeanRat'), 'png');
+saveas(fe2, fullfile(fig_dir, 'Entropy', 'Entropy_MeanRat'), 'png');
 close;
 % Plot all rats as line plot
 fe3 = figure;
 hold on;
-nRats = size(dayEntropy,1);  % Number of rats
+nRats = size(meanDayEntropy,1);  % Number of rats
 for r = 1:nRats
     if strcmp(AgeCell{r}, 'young')
-        plot(uniqueDays, dayEntropy(r,:), '-o', 'Color', youngColor, 'LineWidth', 1.5);
+        plot(uniqueDays, meanDayEntropy(r,:), '-o', 'Color', youngColor, 'LineWidth', 1.5);
     else
-        plot(uniqueDays, dayEntropy(r,:), '-o', 'Color', oldColor, 'LineWidth', 1.5);
+        plot(uniqueDays, meanDayEntropy(r,:), '-o', 'Color', oldColor, 'LineWidth', 1.5);
     end
 end
 xlabel('Day');
@@ -677,30 +770,48 @@ title('Entropy Per Rat');
 pubify_figure_axis_robust(14,14);
 xticks(uniqueDays);
 hold off;
-saveas(fe3, fullfile(fig_dir, 'Entropy_RatChanges'), 'png');
+saveas(fe3, fullfile(fig_dir, 'Entropy', 'Entropy_RatChanges'), 'png');
 close;
+% fe3 = figure;
+% hold on;
+% nRats = size(dayEntropy,1);  % Number of rats
+% for r = 1:nRats
+%     if strcmp(AgeCell{r}, 'young')
+%         plot(uniqueDays, dayEntropy(r,:), '-o', 'Color', youngColor, 'LineWidth', 1.5);
+%     else
+%         plot(uniqueDays, dayEntropy(r,:), '-o', 'Color', oldColor, 'LineWidth', 1.5);
+%     end
+% end
+% xlabel('Day');
+% ylabel('Entropy');
+% title('Entropy Per Rat');
+% pubify_figure_axis_robust(14,14);
+% xticks(uniqueDays);
+% hold off;
+% saveas(fe3, fullfile(fig_dir, 'Entropy_RatChanges'), 'png');
+% close;
 
 %--------------- PLOT PER RAT PER DAY MEAN ENTROPY ----------------------%
-fe4=figure;
-hold on;
-% Calculate dataEntropy for all trials
-dataEntropyYoung = cell(numel(uniqueDays),1);
-dataEntropyOld   = cell(numel(uniqueDays),1);
-for d = 1:numel(uniqueDays)
-    dataEntropyYoung{d}=entropy_vals(uniqueDays(d) & strcmp(data1.Age,'young'));
-    dataEntropyOld{d}=entropy_vals(data1.Day == uniqueDays(d) & strcmp(data1.Age,'old'));
-end
-plot_bar_sem_WaterMaze(uniqueDays, meanEntropy(:,1), semEntropy(:,1), ...
-    meanEntropy(:,2), semEntropy(:,2), dataEntropyYoung, dataEntropyOld, postHocResults);
-title('Mean Entropy (All Trials)');
-xlabel('Day');
-ylabel('Entropy');
-pubify_figure_axis_robust(14,14);
-xticks(uniqueDays)
-hold off;
-saveas(fe4, fullfile(fig_dir, 'Entropy_Mean_AllTrials'), 'png');
-close;
-%% 5) Group Strategy Based Entropy
+% fe4=figure;
+% hold on;
+% % Calculate dataEntropy for all trials
+% dataEntropyYoung = cell(numel(uniqueDays),1);
+% dataEntropyOld   = cell(numel(uniqueDays),1);
+% for d = 1:numel(uniqueDays)
+%     dataEntropyYoung{d}=entropy_vals(uniqueDays(d) & strcmp(data1.Age,'young'));
+%     dataEntropyOld{d}=entropy_vals(data1.Day == uniqueDays(d) & strcmp(data1.Age,'old'));
+% end
+% plot_bar_sem_WaterMaze(uniqueDays, meanEntropy(:,1), semEntropy(:,1), ...
+%     meanEntropy(:,2), semEntropy(:,2), dataEntropyYoung, dataEntropyOld, postHocResults);
+% title('Mean Entropy ');
+% xlabel('Day');
+% ylabel('Entropy');
+% pubify_figure_axis_robust(14,14);
+% xticks(uniqueDays)
+% hold off;
+% saveas(fe4, fullfile(fig_dir, 'Entropy','Entropy_Mean_AllTrials'), 'png');
+% close;
+%% 6) Group Strategy Based Entropy
 % NEED TO HAVE RUN GROUP STRAT BEFORE
 %------------------ Compute Entropy for Each Trial ------------------%
 % Entropy formula: H = -sum(p .* log2(p + eps))
@@ -773,7 +884,7 @@ ylabel('Entropy');
 title('Entropy: All Trials  - Grouped By Strategy Type');
 pubify_figure_axis_robust(14,14);
 hold off;
-saveas(fe1, fullfile(fig_dir, 'GroupStrat_EntropyAllTrials'), 'png');
+saveas(fe1, fullfile(fig_dir, 'Entropy', 'GroupStrat_EntropyAllTrials'), 'png');
 close;
 
 
@@ -783,8 +894,8 @@ uniqueAges = {'young','old'};
 
 
 % For each day and each age group, compute the group mean and SEM from the per-rat means.
-meanEntropy = zeros(numel(uniqueDays), nAges);
-semEntropy = zeros(numel(uniqueDays), nAges);
+meanEntropy = zeros(numel(uniqueDays), numel(uniqueAges));
+semEntropy = zeros(numel(uniqueDays),numel(uniqueAges));
 % Also build cell arrays holding the per-rat means for each day (for scatter overlay)
 dataEntropyYoung = cell(numel(uniqueDays),1);
 dataEntropyOld   = cell(numel(uniqueDays),1);
@@ -817,7 +928,7 @@ ylabel('Entropy');
 pubify_figure_axis_robust(14,14);
 xticks(uniqueDays);
 hold off;
-saveas(fe2, fullfile(fig_dir, 'GroupStrat_Entropy_MeanRat'), 'png');
+saveas(fe2, fullfile(fig_dir,'Entropy', 'GroupStrat_Entropy_MeanRat'), 'png');
 close;
 
 % Plot all rats as line plot
@@ -837,7 +948,7 @@ title('Entropy Per Rat');
 pubify_figure_axis_robust(14,14);
 xticks(uniqueDays);
 hold off;
-saveas(fe3, fullfile(fig_dir, 'GroupStrat_Entropy_RatChanges'), 'png');
+saveas(fe3, fullfile(fig_dir, 'Entropy', 'GroupStrat_Entropy_RatChanges'), 'png');
 close;
 %--------------- PLOT PER RAT PER DAY MEAN ENTROPY ----------------------%
 fe4=figure;
@@ -857,12 +968,17 @@ ylabel('Entropy');
 pubify_figure_axis_robust(14,14);
 xticks(uniqueDays)
 hold off;
-saveas(fe4, fullfile(fig_dir, 'GroupStrat_Entropy_Mean_AllTrials'), 'png');
+saveas(fe4, fullfile(fig_dir, 'Entropy', 'GroupStrat_Entropy_Mean_AllTrials'), 'png');
 close;
 
 
 
-%% 6) Individual Strategy x Platform Group
+%% Change platform groups -test
+data1.pd(data1.pd==4)=3; % Add platform 5 to the same group as 4&6
+
+%data1.pd(data1.pd==2)=1; % Group 2,8, 4,7 in one group
+
+%% 7) Individual Strategy x Platform Group
 
 %Unique variablers
 uniqueDays=unique(data1.Day);
@@ -956,8 +1072,8 @@ for s = 1:numel(strategyNames)
     end
     
     % Save combined ANOVA & Tukey results for this strategy.
-    anovaFile = fullfile(fig_dir, sprintf('3%s_PlatformGroups_ANOVA.csv', stratTitle));
-    tukeyFile = fullfile(fig_dir, sprintf('3%s_PlatformGroups_Tukey.csv', stratTitle));
+    anovaFile = fullfile(processed_dir, sprintf('3%s_PlatformGroups_ANOVA.csv', stratTitle));
+    tukeyFile = fullfile(processed_dir, sprintf('3%s_PlatformGroups_Tukey.csv', stratTitle));
     writetable(all_anova, anovaFile);
     writetable(all_tukey, tukeyFile);
     
@@ -1029,22 +1145,27 @@ for s = 1:numel(strategyNames)
     end
     
     % Add scatter points (jittered) for individual rat values.
-    jitterAmount = 0.05;
+     jitterAmount = 0.05;
+    [nDays, nCols] = size(meanMatrix); % nCols = 2*nPlat
     for d = 1:nDays
-        for c = 1:2*nPlat
+        for c = 1:nCols
             if mod(c,2)==1
-                pIdx = ceil(c/2);
-                pts = dataYoung{d, pIdx};
+                % Odd col => Young
+                pIdx = (c+1)/2; % e.g. c=1 => pIdx=1, c=3 => pIdx=2
+                pts  = dataYoung{d, pIdx};
             else
-                pIdx = ceil(c/2);
-                pts = dataOld{d, pIdx};
+                % Even col => Old
+                pIdx = c/2; 
+                pts  = dataOld{d, pIdx};
             end
-            if isempty(pts)
-                continue;
-            end
+            if isempty(pts), continue; end
+            
             xCenter = hBar(c).XEndPoints(d);
             xJitter = xCenter + (rand(size(pts))-0.5)*jitterAmount;
-            scatter(xJitter, pts, 12, 'MarkerFaceColor', hBar(c).FaceColor, 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 1);
+            
+            scatter(xJitter, pts, 12, ...
+                'MarkerFaceColor', hBar(c).FaceColor, ...
+                'MarkerEdgeColor','none', 'MarkerFaceAlpha',1);
         end
     end
     
@@ -1099,20 +1220,21 @@ for s = 1:numel(strategyNames)
     hold off;
     %Legend
     % legend_labels = cell(1, 2*nPlat);
+    % platform_names={'P1','P2','P3','P4'};
     % for p = 1:nPlat
-    %     legend_labels{2*p-1} = sprintf('P%d - Young', uniquePlatforms(p));
-    %     legend_labels{2*p}   = sprintf('P%d - Old', uniquePlatforms(p));
+    %     legend_labels{2*p-1} = sprintf('%s: Young', platform_names{p});
+    %     legend_labels{2*p}   = sprintf('%s: Old', platform_names{p});
     % end
-    % legend(hBar, legend_labels, 'Location', 'bestoutside');
+    %legend(hBar, legend_labels, 'Location', 'bestoutside');
     pubify_figure_axis_robust(14,14);
     % Save the figure
-    saveas(fH, fullfile(fig_dir, sprintf('3Platform_%s.png', stratTitle)));
+    saveas(fH, fullfile(fig_dir,'Platform', sprintf('3Platform_%s.png', stratTitle)));
     close(fH);
 end
 
 
 
-%% 7) Group Strategy x Platform Group
+%% 8) Group Strategy x Platform Group
 strategyGroups = {
     {'thigmotaxis', 'circling', 'random_path'}, 'Non-Goal Oriented'; 
     {'scanning', 'chaining'}, 'Procedural'; 
@@ -1214,8 +1336,8 @@ for g = 1:nGroups
     end
     
     % Save the combined ANOVA & Tukey results for this group.
-    anovaFile = fullfile(fig_dir, sprintf('3%s_PlatformGroups_ANOVA.csv', groupTitle));
-    tukeyFile = fullfile(fig_dir, sprintf('3%s_PlatformGroups_Tukey.csv', groupTitle));
+    anovaFile = fullfile(processed_dir, sprintf('3%s_PlatformGroups_ANOVA.csv', groupTitle));
+    tukeyFile = fullfile(processed_dir, sprintf('3%s_PlatformGroups_Tukey.csv', groupTitle));
     writetable(all_anova, anovaFile);
     writetable(all_tukey, tukeyFile);
     
@@ -1261,7 +1383,7 @@ for g = 1:nGroups
     %Plotting the Grouped Bar Chart with Sigstar
     fH = figure('Name', groupTitle, 'Color', [1 1 1]);
     sgtitle(groupTitle, 'FontSize', 14, 'FontWeight', 'bold');
-    ylim([0 1])
+    ylim([0 1.2])
     hold on;
     hBar = bar(meanMatrix, 'grouped');
     set(gca, 'XTick', 1:nDays, 'XTickLabel', arrayfun(@num2str, uniqueDays, 'UniformOutput', false));
@@ -1353,15 +1475,18 @@ for g = 1:nGroups
     end
     
     hold off;
+    % %Legend
     % legend_labels = cell(1, 2*nPlat);
+    % platform_names={'P1','P2','P3','P4'};
     % for p = 1:nPlat
-    %     legend_labels{2*p-1} = sprintf('P%d - Young', uniquePlatforms(p));
-    %     legend_labels{2*p}   = sprintf('P%d - Old', uniquePlatforms(p));
+    %     legend_labels{2*p-1} = sprintf('%s: Young', platform_names{p});
+    %     legend_labels{2*p}   = sprintf('%s: Old', platform_names{p});
     % end
     % legend(hBar, legend_labels, 'Location', 'bestoutside');
+    % 
     pubify_figure_axis_robust(14,14);
     % Save the figure
-    saveas(fH, fullfile(fig_dir, sprintf('3Platform_%s.png', groupTitle)));
+    saveas(fH, fullfile(fig_dir, 'Platform',sprintf('3Platform_%s.png', groupTitle)));
     close(fH);
 end
 

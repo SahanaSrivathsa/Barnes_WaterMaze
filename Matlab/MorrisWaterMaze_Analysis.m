@@ -7,12 +7,12 @@
 
 %% GET DATA
 % Parameters
-base_dir='G:\WMAZE_Data\Data_Behaviour\Data_CognitiveBattery\WaterMaze';
-proc_dir=fullfile(base_dir);
+base_dir='G:\WMAZE_Data\Data_Behaviour\Data_CognitiveBattery\WaterMaze\Mia_Proj\RawFiles';
+proc_dir=fullfile(base_dir,'Processed');
 % Mk dir 
-% if ~exist(proc_dir, "dir")
-%     mkdir(proc_dir);
-% end
+if ~exist(proc_dir, "dir")
+    mkdir(proc_dir);
+end
 
 % Get all .xlsx files in base_dir
 files = dir(fullfile(base_dir,'*.xlsx'));
@@ -22,7 +22,7 @@ AllSpatial = table();
 AllProbe   = table();
 AllVisual  = table();
 
-for i = 1:numel(files)
+for i =1:numel(files)
     fname = fullfile(base_dir, files(i).name);
 
     %--- Parse cohort from filename: e.g. "Coh21_..."
@@ -66,7 +66,8 @@ for i = 1:numel(files)
     
     %=== Read "Probe" sheet
     pbT = readtable(fname,'Sheet','Probe','VariableNamesRange',1);
-    pbCols = {'Animal','Duration','Distance','Q1_Time','Platform_Entries','Platform_CIPL'};
+    pbCols = {'Animal','Trial','Duration','Distance','Q1_Time',...
+        'Platform_Entries'};%,'Platform_CIPL' 0 Currenlty all dont have CIPL
     pbKeep = intersect(pbCols, pbT.Properties.VariableNames);
     pbT = pbT(:,pbKeep);%--- For each row in the Key table, fill the matching Animal's Age
     for k = 1:height(keyT)
@@ -92,7 +93,7 @@ for i = 1:numel(files)
     
     %=== Read "Visual" sheet
     vsT = readtable(fname,'Sheet','Visual','VariableNamesRange',1);
-    vsCols = {'Animal','Duration','Distance','PathEfficiency','Platform_CIPL'};
+    vsCols = {'Animal','Duration','Distance''Platform_CIPL'};%,'PathEfficiency',
     vsKeep = intersect(vsCols, vsT.Properties.VariableNames);
     vsT = vsT(:,vsKeep);
     for k = 1:height(keyT)
@@ -128,7 +129,7 @@ T = sortrows(T, ["Animal","Trial"]);
 T.Group = repmat("Old",height(T),1);
 T.Group(T.Age < 15) = "Young";
 T.Day = floor((T.Trial-1)/6) + 1; % Separates trials by which day (6 trials per day)
-%% CHRIS -make it prettier as below - add plots and include T Test (Welch)
+%% First Trial COmparison
 first_cipl=T.Platform_CIPL(T.Trial==1);
 first_age=T.Group(T.Trial==1);
 youngData=first_cipl(first_age=='Young');
@@ -141,11 +142,11 @@ boxchart(2*ones(size(oldData)), oldData, ...
      'BoxFaceColor',[0.5 0 0.5], 'LineWidth',1.5); % purple
 % T-test (Welch's)
 [~, p] = ttest2(youngData, oldData, 'Vartype','unequal');
-fprintf('The P value for the first trial is %f',p);
+fprintf('\n The P value for the first trial is %f \n',p);
 title('First Trial CIPL Performance')
 xticks([1 2])
 pubify_figure_axis_robust(14,14)
-xticklabels(['Young' ;'Old'])
+xticklabels(['Young' 'Old'])
 %% Rest of code
 %Variables to interate over
 varList = {'Platform_CIPL','Duration','Distance','PathEfficiency'};

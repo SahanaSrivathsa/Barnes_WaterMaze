@@ -22,8 +22,8 @@ function plot_bar_sem_WaterMaze(uniqueDays, meanYoung, semYoung, meanOld, semOld
 %SS 2025
 %% PARAMETERS THAT MIGHT CHANGE
 % colors
-youngColor = [0 0.6 0]; %green
-oldColor   = [0.5 0 0.5]; % purple
+ oldColor=[0.4157,0.1059,0.6039]; %green
+ youngColor=[0.2196,0.5569,0.2353];% purple
 %Extract_varargin; %Change color defaults
 %% 
 nDays = numel(uniqueDays);
