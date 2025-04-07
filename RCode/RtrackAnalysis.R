@@ -12,7 +12,7 @@ rtrack_folder <- "/Users/miasponseller/Desktop/Lab/Rtrack"
 rat_list <- read.csv("/Users/miasponseller/Desktop/Lab/Rtrack/Rat_List.csv")
 
 # Cohort list and their corresponding file paths
-cohort_list <- c(1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+cohort_list <- c(1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21) # Cohort numbers
 cohort_file_paths <- sapply(cohort_list, function(cohort) {
   file.path(rtrack_folder, "/Cohorts/", paste0("Cohort", cohort))},
   USE.NAMES = FALSE)
@@ -115,21 +115,21 @@ process_single_path <- function(cohort_num, trial_num, output_folder = "/Users/m
   }
   
   plot_path(metrics)
-  plot_density(metrics)
+  #plot_density(metrics)
   
-  # Save the plots to a PDF file
-  pdf_file <- file.path(output_folder, paste0("cohort", cohort_num, "_trial", trial_num, "_plots.pdf")) # output file name
-
-  tryCatch({
-    pdf(file = pdf_file)
-    message("Saving path and density plot for cohort ", cohort_num, ", trial ", trial_num, " to ", pdf_file)
-    plot_path(metrics) # path trajectory
-    plot_density(metrics) # density heat map
-    dev.off()
-    message("Finished saving plots for cohort ", cohort_num, ", trial ", trial_num)
-  }, error = function(e) {
-    warning(paste("Error generating PDF for cohort", cohort_num, "trial", trial_num, ": ", e$message))
-  })
+  # # Save the plots to a PDF file
+  # pdf_file <- file.path(output_folder, paste0("cohort", cohort_num, "_trial", trial_num, "_plots.pdf")) # output file name
+  # 
+  # tryCatch({
+  #   pdf(file = pdf_file)
+  #   message("Saving path and density plot for cohort ", cohort_num, ", trial ", trial_num, " to ", pdf_file)
+  #   plot_path(metrics) # path trajectory
+  #   plot_density(metrics) # density heat map
+  #   dev.off()
+  #   message("Finished saving plots for cohort ", cohort_num, ", trial ", trial_num)
+  # }, error = function(e) {
+  #   warning(paste("Error generating PDF for cohort", cohort_num, "trial", trial_num, ": ", e$message))
+  # })
   
 }
 
@@ -144,8 +144,8 @@ bulk_process_experiment <- function() {
 }
 
 
-# Save Figures ------------------------------------------------------------
 
+# Plot All Paths and Save -------------------------------------------------
 plot_all_paths <- function(cohort_list, output_folder = "/Users/miasponseller/Desktop/Lab/Rtrack/Plot_PDFs") {
   # Create output folder if it doesn't exist
   if (!dir.exists(output_folder)) {
@@ -236,13 +236,11 @@ strategy_plots <- function() {
   Rtrack::plot_strategies(strategies, experiment = experiment)
   
   # Strategy plots, by Cohort
-  Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Cohort")
+  #Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Cohort")
   
   # Strategy plots, by Age
   Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Age")
 }
-
-strategy_plots()
 
 
 # Analysis of selected metrics --------------------------------------------
@@ -284,7 +282,7 @@ bulk_density_map <- function() {
 # Run Functions ------------------------------------------------------------
 
 #all_rats_experiment_desc_file(cohort_list, cohort_file_paths, rat_list, rtrack_folder)
-#process_single_path(2, 167)
+process_single_path(13, 5)
 #bulk_process_experiment()
 #plot_all_paths(cohort_list)
 #bulk_strategy_calling()

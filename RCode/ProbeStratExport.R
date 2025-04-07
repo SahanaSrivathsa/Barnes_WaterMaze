@@ -1,6 +1,9 @@
 library(openxlsx)
 library(readxl)
 
+# could just have experiment description file for all trials in experiment with Probe column so it's not necessary to create a second description file.
+# add code for creating All_Rats_Probe.xlsx sheet
+
 all_rats_probe_desc <- file.path("/Users/miasponseller/Desktop/Lab/Rtrack/All_Rats_Probe.xlsx") # all rats experiment description file, must be an .xlsx
 trials_dir <- "/Users/miasponseller/Desktop/Lab/Rtrack/All Probe Trials" # folder with all trials path data
 strat_export_fp <- paste0("/Users/miasponseller/Desktop/Lab/Rtrack/MWM_results_Probe_", format(Sys.Date(), "%m-%d-%Y"), ".xlsx") # output file path

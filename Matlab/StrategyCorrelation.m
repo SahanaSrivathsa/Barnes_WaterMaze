@@ -1,5 +1,5 @@
 %% ------------- MUST RUN SECTION FOR ALL FURTHER ANALYSIS ------------- %%
-base_dir='G:\WMAZE_Data\Data_Behaviour\Data_CognitiveBattery\WaterMaze\Mia_Proj';
+base_dir='/Users/miasponseller/Desktop/Lab/Rtrack';
 processed_dir=fullfile(base_dir,'StrategyProcessed');
 fig_dir=fullfile(base_dir,'Figures');
 

@@ -4,9 +4,9 @@ library(ggplot2)
 library(readxl)
 
 
-fp <- read_excel("/Users/miasponseller/Desktop/Lab/Rtrack/MWM_results.xlsx")
-n_young <- 28
-n_old <- 57
+fp <- read_excel("/Users/miasponseller/Desktop/Lab/Rtrack/MWM_results_04-06-2025.xlsx")
+n_young <- 37
+n_old <- 66
 
 
 # Strategy counts table, young and old total and across days --------------
@@ -174,52 +174,71 @@ strats_all_days_ages <- function(result) {
 
 # By types -----------------------------------------------------------------
 
-by_type <- function(result) {
+# bar chart showing the strategy types avg probability each day for young and old
+by_type <- function(fp) {
   
-  non_goal_oriented <- c("thigmotaxis", "circling", "random path")
+  # Strategy categories
+  non_goal_oriented <- c("thigmotaxis", "circling", "random_path")
   procedural <- c("scanning", "chaining")
-  allocentric <- c("directed search", "corrected path", "direct path")
+  allocentric <- c("directed_search", "corrected_search", "direct_path")
   
-  # stacked histogram by type for young and old
+  # Convert to long format and categorize
+  long_data <- fp %>% 
+    pivot_longer(cols = all_of(c(non_goal_oriented, procedural, allocentric)),
+                 names_to = "strat_type", values_to = "probability") %>%
+    mutate(strategy_type = case_when(
+      strat_type %in% non_goal_oriented ~ "Non-Goal Oriented",
+      strat_type %in% procedural ~ "Procedural",
+      strat_type %in% allocentric ~ "Allocentric"
+    ))
   
-  long_data <- result %>% 
-    pivot_longer(
-      cols = starts_with("day"),
-      names_to = c("Day", "Age"),
-      names_pattern = "day(\\d)(\\w+)",
-      values_to = "Count"
-    ) %>% 
-    mutate(
-      Day = as.factor(Day),
-      Age = factor(Age, levels = c("young", "old")),
-      type = case_when(
-        name %in% non_goal_oriented ~ "Non-goal Oriented",
-        name %in% procedural ~ "Procedural",
-        name %in% allocentric ~ "Allocentric"
+  # Summarize mean probabilities
+  df_summary <- long_data %>% 
+    group_by(Age, `_Day`, strategy_type) %>%
+    summarize(mean_prob = mean(probability, na.rm = TRUE), .groups = "drop") %>%
+    mutate(age_strategy = paste(Age, strategy_type, sep = "_"))
+  
+  # Ensure Age is a factor with the desired order
+  df_summary$Age <- factor(df_summary$Age, levels = c("young", "old"))
+  
+  # Reorder the age_strategy factor levels to ensure "young" comes before "old"
+  df_summary$age_strategy <- factor(df_summary$age_strategy,
+                                    levels = c(
+                                      "young_Allocentric", "young_Procedural", "young_Non-Goal Oriented",
+                                      "old_Allocentric", "old_Procedural", "old_Non-Goal Oriented"
+                                    ))
+  
+  # Define custom colors
+  color_map <- c(
+    "young_Allocentric" = "#98FB98",    # light green
+    "young_Procedural" = "#32CD32",     # medium green
+    "young_Non-Goal Oriented" = "#228B22", # dark green
+    "old_Allocentric" = "#b19cd9",      # light purple
+    "old_Procedural" = "#9370DB",       # medium purple
+    "old_Non-Goal Oriented" = "#6A5ACD" # dark purple
+  )
+  
+  # Plot
+  ggplot(df_summary, aes(x = factor(`_Day`), y = mean_prob, fill = age_strategy)) +
+    geom_bar(stat = "identity", position = "dodge") +  # Position bars side-by-side
+    scale_fill_manual(
+      values = color_map,
+      labels = c(
+        "young_Allocentric" = "Young Allocentric",
+        "young_Procedural" = "Young Procedural",
+        "young_Non-Goal Oriented" = "Young Non-Goal Oriented",
+        "old_Allocentric" = "Old Allocentric",
+        "old_Procedural" = "Old Procedural",
+        "old_Non-Goal Oriented" = "Old Non-Goal Oriented"
       )
-    )
-  
-  young_data <- long_data %>% filter(Age == "young")
-  old_data <- long_data %>% filter(Age == "old")
-  
-  young_type_plot <- ggplot(young_data, aes(x = Day, y = Count/25, fill = type)) + 
-    geom_bar(stat = "identity", position = "stack") +
-    labs(title = "Young Rats Strategies by Type Across Days",
-         x = "Day",
-         y = "Frequency") +
-    scale_fill_brewer(palette = "Set1") +
-    theme_minimal()
-  
-  old_type_plot <- ggplot(old_data, aes(x = Day, y = Count/54, fill = type)) + 
-    geom_bar(stat = "identity", position = "stack") +
-    labs(title = "Old Rats Strategies by Type Across Days",
-         x = "Day",
-         y = "Frequency") +
-    scale_fill_brewer(palette = "Set1") +
-    theme_minimal()
-  
-  return(list(young_type_plot = young_type_plot, old_type_plot = old_type_plot))
-}  
+    ) +
+    labs(title = "Average Strategy Probability by Day and Age Group", 
+         x = "Day", y = "Mean Probability", fill = "Strategy Type") +
+    theme_minimal() 
+  }
+
+
+
 
 
 
@@ -238,11 +257,11 @@ prob_means <- function(fp) {
     summarise(
       thigmotaxis_avg = mean(thigmotaxis, na.rm = TRUE),
       circling_avg = mean(circling, na.rm = TRUE),
-      random_path_avg = mean(`random path`, na.rm = TRUE),
+      random_path_avg = mean(random_path, na.rm = TRUE),
       chaining_avg = mean(chaining, na.rm = TRUE),
-      directed_search_avg = mean(`directed search`, na.rm = TRUE),
-      corrected_serach_avg = mean(`corrected search`, na.rm = TRUE),
-      direct_path_avg = mean(`direct path`, na.rm = TRUE),
+      directed_search_avg = mean(directed_search, na.rm = TRUE),
+      corrected_serach_avg = mean(corrected_search, na.rm = TRUE),
+      direct_path_avg = mean(direct_path, na.rm = TRUE),
       perseverance_avg = mean(perseverance, na.rm = TRUE),
       .groups = "drop"
     )
@@ -258,6 +277,6 @@ prob_means <- function(fp) {
 #strat_hist(strat_counts(fp))
 #strat_bar_chart(strat_counts(fp))
 #strats_all_days_ages(strat_counts(fp))
-#by_type(strat_counts(fp))
+by_type(fp)
 
 
