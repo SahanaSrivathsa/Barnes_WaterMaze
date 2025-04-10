@@ -1,0 +1,8 @@
+"0",""
+"0","ggplot(pengs, aes(x = body_mass_g, y = flipper_length_mm, color = species)) +"
+"0","  geom_point() +"
+"0","  geom_smooth(method = ""lm"") +"
+"0","  theme_minimal() +"
+"0","  labs(title = ""Body Mass vs Flipper Length"","
+"0","       x = ""Body Mass (g)"","
+"0","       y = ""Flipper Length (mm)"")"

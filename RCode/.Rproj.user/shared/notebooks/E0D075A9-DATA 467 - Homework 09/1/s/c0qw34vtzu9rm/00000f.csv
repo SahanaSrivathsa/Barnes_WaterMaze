@@ -1,0 +1,4 @@
+"0","library(palmerpenguins)"
+"0","library(ggplot2)"
+"0",""
+"0","pengs <- na.exclude(penguins)"

@@ -1,0 +1,7 @@
+"0","ggplot(pengs, aes(x = bill_length_mm, y = flipper_length_mm, color = species)) +"
+"0","  geom_point() +"
+"0","  geom_smooth(method = ""lm"") +"
+"0","  theme_minimal() +"
+"0","  labs(title = ""Bill Length vs Flipper Length"","
+"0","       x = ""Bill Length (mm)"","
+"0","       y = ""Flipper Length (mm)"")"
