@@ -3,7 +3,6 @@ library(dplyr)
 library(ggplot2)
 library(readxl)
 
-
 fp <- read_excel("/Users/miasponseller/Desktop/Lab/Rtrack/MWM_results_04-06-2025.xlsx")
 n_young <- 37
 n_old <- 66
@@ -192,35 +191,37 @@ by_type <- function(fp) {
       strat_type %in% allocentric ~ "Allocentric"
     ))
   
-  # Summarize mean probabilities
+  # Summarize mean and standard error
   df_summary <- long_data %>% 
     group_by(Age, `_Day`, strategy_type) %>%
-    summarize(mean_prob = mean(probability, na.rm = TRUE), .groups = "drop") %>%
+    summarize(mean_prob = mean(probability, na.rm = TRUE), 
+              se = sd(probability, na.rm = TRUE)/sqrt(n()),
+              .groups = "drop") %>%
     mutate(age_strategy = paste(Age, strategy_type, sep = "_"))
   
-  # Ensure Age is a factor with the desired order
+  # Factor levels
   df_summary$Age <- factor(df_summary$Age, levels = c("young", "old"))
-  
-  # Reorder the age_strategy factor levels to ensure "young" comes before "old"
   df_summary$age_strategy <- factor(df_summary$age_strategy,
                                     levels = c(
                                       "young_Allocentric", "young_Procedural", "young_Non-Goal Oriented",
                                       "old_Allocentric", "old_Procedural", "old_Non-Goal Oriented"
                                     ))
-  
-  # Define custom colors
+
+  # custom colors
   color_map <- c(
-    "young_Allocentric" = "#98FB98",    # light green
-    "young_Procedural" = "#32CD32",     # medium green
-    "young_Non-Goal Oriented" = "#228B22", # dark green
-    "old_Allocentric" = "#b19cd9",      # light purple
-    "old_Procedural" = "#9370DB",       # medium purple
-    "old_Non-Goal Oriented" = "#6A5ACD" # dark purple
+    "young_Allocentric" = "#98FB98",  
+    "young_Procedural" = "#32CD32",   
+    "young_Non-Goal Oriented" = "#228B22", 
+    "old_Allocentric" = "#b19cd9",     
+    "old_Procedural" = "#9370DB",     
+    "old_Non-Goal Oriented" = "#6A5ACD" 
   )
   
   # Plot
   ggplot(df_summary, aes(x = factor(`_Day`), y = mean_prob, fill = age_strategy)) +
-    geom_bar(stat = "identity", position = "dodge") +  # Position bars side-by-side
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
+    geom_errorbar(aes(ymin = mean_prob - se, ymax = mean_prob + se),
+                  position = position_dodge(width = 0.9), width = 0.2) +
     scale_fill_manual(
       values = color_map,
       labels = c(
@@ -232,14 +233,17 @@ by_type <- function(fp) {
         "old_Non-Goal Oriented" = "Old Non-Goal Oriented"
       )
     ) +
-    labs(title = "Average Strategy Probability by Day and Age Group", 
+    labs(title = "Average Strategy Type Probability by Day and Age Group", 
          x = "Day", y = "Mean Probability", fill = "Strategy Type") +
-    theme_minimal() 
+    theme_minimal() +
+    theme(
+      axis.text = element_text(size = 14),
+      axis.title = element_text(size = 16),
+      plot.title = element_text(size = 18, face = "bold"),
+      legend.title = element_text(size = 14),
+      legend.text = element_text(size = 12)
+    )
   }
-
-
-
-
 
 
 # prob_means ------------------------------------------------------------
