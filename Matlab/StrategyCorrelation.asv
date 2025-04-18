@@ -1,5 +1,5 @@
 %% ------------- MUST RUN SECTION FOR ALL FURTHER ANALYSIS ------------- %%
-base_dir='/Users/miasponseller/Desktop/Lab/Rtrack';
+base_dir='G:\WMAZE_Data\Data_Behaviour\Data_CognitiveBattery\WaterMaze\Mia_Proj';
 processed_dir=fullfile(base_dir,'StrategyProcessed');
 fig_dir=fullfile(base_dir,'Figures');
 
@@ -369,6 +369,7 @@ for s = 1:nStrategies
     
     mean_strat_table = cell2table(mean_strat, 'VariableNames', ...
         {'RatID', 'Age', 'Day1', 'Day2', 'Day3', 'Day4'});
+    data_matrix=[mean]
     % Run mixed-design ANOVA (within-subject-Day &between-subject-age)
     anovaResults = runMixedANOVA(mean_strat_table, {'Day1','Day2','Day3','Day4'});
     % Run Tukey post hoc tests for the Day factor (by Age)
@@ -996,10 +997,8 @@ blendLevels = linspace(0.6, 0, 4)';  % from light to base color
 
 % Blend with white
 youngShades = blendLevels .* 1 + (1 - blendLevels) .* youngColor;
-oldShades   = blendLevels .* 1 + (1 - blendLevels) .* oldColor;
-% Base colors
-clrYoungSig = [0.2196, 0.5569, 0.2353]; % green
-clrOldSig   = [0.4157, 0.1059, 0.6039]; % purple
+oldShades   = blendLevels .* 1 + (1 - blendLevels) .* clrOldSig;
+
 clrBothSig  = [0.3 0.3 0.3];% gray
 
 %Loop over strategies

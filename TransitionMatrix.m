@@ -414,7 +414,7 @@ for d = 1:nDays
     if ~isempty(G_young_day.Edges)
         LWidths = 1 + 5 * G_young_day.Edges.Weight / max(G_young_day.Edges.Weight);
         edgeLabels = round(G_young_day.Edges.Weight * 100) / 100;
-        p = plot(G_young_day, 'EdgeLabel', edgeLabels, 'LineWidth', LWidths);
+        p = plot(G_young_day, 'LineWidth', LWidths);
         p.NodeColor = youngColor;
         p.NodeFontSize = 10;
         p.EdgeColor = youngColor;
@@ -435,7 +435,7 @@ for d = 1:nDays
     if ~isempty(G_old_day.Edges)
         LWidths = 1 + 5 * G_old_day.Edges.Weight / max(G_old_day.Edges.Weight);
         edgeLabels = round(G_old_day.Edges.Weight * 100) / 100;
-        p = plot(G_old_day, 'EdgeLabel', edgeLabels, 'LineWidth', LWidths);
+        p = plot(G_old_day,  'LineWidth', LWidths);
         p.NodeColor = oldColor;
         p.NodeFontSize = 10;
         p.EdgeColor = oldColor;
