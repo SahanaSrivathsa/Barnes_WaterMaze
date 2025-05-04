@@ -19,7 +19,7 @@ nStrategies = numel(strategyNames);
 strategy_titles={'Thigmotaxis','Circling','Random Path','Scanning',...
     'Chaining','Directed Search','Corrected Search','Direct Path','Perseverance'};
 
-%% CHECK FOR CONSISTENCY in datasets (Trial no and full values)
+% CHECK FOR CONSISTENCY in datasets (Trial no and full values)
 
 %--- For data1: Check that each unique x_TargetID has 24 unique trials ---
 grp1 = varfun(@(x) numel(unique(x)), data1, 'GroupingVariables', 'x_TargetID', 'InputVariables', 'x_Trial');
@@ -273,7 +273,6 @@ end
 for s = 1:nStrategies
     %-------------- Individual Rat Plot --------------%
     stratProb = data1.(strategyNames{s});
-    
     % Get idx for young and old groups based on the age
     isYoung = strcmp(data1.Age, 'young');
     isOld   = strcmp(data1.Age, 'old');
@@ -367,9 +366,9 @@ for s = 1:nStrategies
     close;
     
     % Convert cell array to table for ANOVA and post hoc tests
+    
     mean_strat_table = cell2table(mean_strat, 'VariableNames', ...
         {'RatID', 'Age', 'Day1', 'Day2', 'Day3', 'Day4'});
-    
     % Run mixed-design ANOVA (within-subject-Day &between-subject-age)
     anovaResults = runMixedANOVA(mean_strat_table, {'Day1','Day2','Day3','Day4'});
     % Run Tukey post hoc tests for the Day factor (by Age)
@@ -974,9 +973,10 @@ close;
 
 
 %% Change platform groups -test
+% 3 platform groups
 data1.pd(data1.pd==4)=3; % Add platform 5 to the same group as 4&6
-
-%data1.pd(data1.pd==2)=1; % Group 2,8, 4,7 in one group
+% 2 Platform groups
+data1.pd(data1.pd==2)=1; % Group 2,8, 4,7 in one group
 
 %% 7) Individual Strategy x Platform Group
 
@@ -984,11 +984,22 @@ data1.pd(data1.pd==4)=3; % Add platform 5 to the same group as 4&6
 uniqueDays=unique(data1.Day);
 uniqueRats=unique(data1.x_TargetID);
 uniquePlatforms=unique(data1.pd);
+uniquePlatforms = uniquePlatforms(~isnan(uniquePlatforms)); % Remove NaNs to avoid duplicate names
+
 % Colors for plotting
-youngShades = [0.80 1.00 0.80; 0.60 0.85 0.60; 0.30 0.70 0.30; 0.00 0.60 0.00];
-oldShades   = [0.85 0.65 0.85; 0.75 0.40 0.75; 0.60 0.25 0.60; 0.50 0.00 0.50];
-clrYoungSig = [0 0.6 0];    % green
-clrOldSig   = [0.5 0 0.5];  % purple
+% Base colors
+youngColor = [0.2196, 0.5569, 0.2353]; % green
+oldColor   = [0.4157, 0.1059, 0.6039]; % purple
+
+% Generate 4 shades from light to dark by blending with white and darkening
+blendLevels = linspace(0.6, 0, 4)';  % from light to base color
+
+% Blend with white
+youngShades = blendLevels .* 1 + (1 - blendLevels) .* youngColor;
+oldShades   = blendLevels .* 1 + (1 - blendLevels) .* oldColor;
+% Base colors
+clrYoungSig = [0.2196, 0.5569, 0.2353]; % green
+clrOldSig   = [0.4157, 0.1059, 0.6039]; % purple
 clrBothSig  = [0.3 0.3 0.3];% gray
 
 %Loop over strategies
@@ -1247,12 +1258,24 @@ groupStrat = cell(1, nGroups);
 uniqueDays=unique(data1.Day);
 uniqueRats=unique(data1.x_TargetID);
 uniquePlatforms=unique(data1.pd);
+uniquePlatforms = uniquePlatforms(~isnan(uniquePlatforms)); % Remove NaNs
 % Colors for plotting
-youngShades = [0.80 1.00 0.80; 0.60 0.85 0.60; 0.30 0.70 0.30; 0.00 0.60 0.00];
-oldShades   = [0.85 0.65 0.85; 0.75 0.40 0.75; 0.60 0.25 0.60; 0.50 0.00 0.50];
-clrYoungSig = [0 0.6 0];    % green
-clrOldSig   = [0.5 0 0.5];  % purple
+% Base colors
+clrYoungSig = [0.2196, 0.5569, 0.2353]; % green
+clrOldSig   = [0.4157, 0.1059, 0.6039]; % purple
+
+% Generate 4 shades from light to dark by blending with white and darkening
+blendLevels = linspace(0.6, 0, 4)';  % from light to base color
+
+% Blend with white
+youngShades = blendLevels .* 1 + (1 - blendLevels) .* clrYoungSig;
+oldShades   = blendLevels .* 1 + (1 - blendLevels) .* clrOldSig;
 clrBothSig  = [0.3 0.3 0.3];% gray
+% youngShades = [0.80 1.00 0.80; 0.60 0.85 0.60; 0.30 0.70 0.30; 0.00 0.60 0.00];
+% oldShades   = [0.85 0.65 0.85; 0.75 0.40 0.75; 0.60 0.25 0.60; 0.50 0.00 0.50];
+% clrYoungSig = [0 0.6 0];    % green
+% clrOldSig   = [0.5 0 0.5];  % purple
+% clrBothSig  = [0.3 0.3 0.3];% gray
 % Loop over each strategy group to compute the aggregated group probability
 for g = 1:nGroups
     currentStrategies = strategyGroups{g,1};
