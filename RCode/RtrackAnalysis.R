@@ -14,7 +14,7 @@ rat_list <- read.csv("/Users/miasponseller/Desktop/Lab/Rtrack/Rat_List.csv")
 # Cohort list and their corresponding file paths
 cohort_list <- c(1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21) # Cohort numbers
 cohort_file_paths <- sapply(cohort_list, function(cohort) {
-  file.path(rtrack_folder, "/Cohorts/", paste0("Cohort", cohort))},
+  file.path(rtrack_folder, "Cohorts", paste0("Cohort", cohort))},
   USE.NAMES = FALSE)
 
 # all rats experiment description file (if exists, must be an .xlsx)
@@ -116,10 +116,10 @@ process_single_path <- function(cohort_num, trial_num, output_folder = "/Users/m
   
   plot_path(metrics)
   #plot_density(metrics)
-  
-  # # Save the plots to a PDF file
-  # pdf_file <- file.path(output_folder, paste0("cohort", cohort_num, "_trial", trial_num, "_plots.pdf")) # output file name
-  # 
+
+  # Save the plots to a PDF file
+  pdf_file <- file.path(output_folder, paste0("cohort", cohort_num, "_trial", trial_num, "_plots.pdf")) # output file name
+
   # tryCatch({
   #   pdf(file = pdf_file)
   #   message("Saving path and density plot for cohort ", cohort_num, ", trial ", trial_num, " to ", pdf_file)
@@ -232,6 +232,11 @@ strategy_plots <- function() {
     bulk_strategy_calling()
   }
   
+  par(cex.lab = 1.4,   # Adjust axis label size
+      cex.axis = 1.3,  # Adjust tick mark labels
+      cex.main = 1.6,  # Main title size
+      cex.sub = 1.2)   # Subtitle size
+
   # Strategy plot, across all rats
   Rtrack::plot_strategies(strategies, experiment = experiment)
   
@@ -282,14 +287,14 @@ bulk_density_map <- function() {
 # Run Functions ------------------------------------------------------------
 
 #all_rats_experiment_desc_file(cohort_list, cohort_file_paths, rat_list, rtrack_folder)
-#process_single_path(13, 5)
+#process_single_path(16, 91)
 #bulk_process_experiment()
 #plot_all_paths(cohort_list)
-#bulk_strategy_calling()
-#strategy_plots()
+#bulk_strategy_calling() 
+strategy_plots()
 #selected_metrics_plot()
 #bulk_density_map()
-#strat_export()
+
 
 
 
