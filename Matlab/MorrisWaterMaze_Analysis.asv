@@ -194,32 +194,31 @@ for v = 1:numel(varList)
     for r = 1:numel(ratsYoung)
         d = RatDayAvg(RatDayAvg.Animal==ratsYoung(r) & RatDayAvg.Group=="Young",:);
         d = sortrows(d,"Day");
-        plot(d.Day, d.(['mean_',varName]), 'Color',[clrMap{1}, 0.175],'LineWidth',2);
+        plot(d.Day, d.(['mean_',varName]), 'Color',clrMap{1},'LineWidth',2);
     end
     % Plot faint lines for Old
     for r = 1:numel(ratsOld)
         d = RatDayAvg(RatDayAvg.Animal==ratsOld(r) & RatDayAvg.Group=="Old",:);
         d = sortrows(d,"Day");
-        plot(d.Day, d.(['mean_',varName]), 'Color',[clrMap{2}, 0.175],'LineWidth',2);
+        plot(d.Day, d.(['mean_',varName]), 'Color',clrMap{2},'LineWidth',2);
     end
 
     % Bold group means on top
     y = plot(G.Day(G.Group=="Young"), G.(['mean_',varName])(G.Group=="Young"), ...
-             '-o','Color',clrMap{1},'LineWidth',8,'DisplayName','Young');
+             '-o','Color',clrMap{1},'LineWidth',6,'DisplayName','Young');
     o = plot(G.Day(G.Group=="Old"),   G.(['mean_',varName])(G.Group=="Old"), ...
-             '-o','Color',clrMap{2},'LineWidth',8,'DisplayName','Old');
+             '-o','Color',clrMap{2},'LineWidth',6,'DisplayName','Old');
 
     xlabel('Day','FontSize',14,'FontWeight','bold'); 
     %ylabel(['Average ', varName],'FontSize',12,'FontWeight','bold','Interpreter','none'); 
     ylabel(['CIPL Score (m\cdots)'],'FontSize',14,'FontWeight','bold','Interpreter','tex'); 
     xticks([1 2 3 4])
-    xlim([0.95 4.05])
+    xlim([0.95 4.15])
     ymax2 = max(RatDayAvg.(['mean_',varName]));
     if ~isnan(ymax2), ylim([0 ymax2]); end
     legend([y;o],{'Young','Old'},'FontSize',14,'FontWeight','bold');
+    title(['Performance on MWM'],'FontSize',16,'Interpreter','none');
     pubify_figure_axis_robust(16,16)
-    title(['Performance on Morris watermaze'],'FontSize',20);
-    
     hold off
     saveas(fig2, fullfile(proc_dir,['MorrisWaterMaze_',varName,'_All']),'png');
 

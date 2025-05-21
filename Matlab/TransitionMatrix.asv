@@ -1,6 +1,7 @@
 %% ------------- MUST RUN SECTION FOR ALL FURTHER ANALYSIS ------------- %%
 % Dirs
-base_dir='G:\WMAZE_Data\Data_Behaviour\Data_CognitiveBattery\WaterMaze\Mia_Proj';
+
+base_dir='C:\DATA\WaterMaze\Mia_Proj';
 processed_dir=fullfile(base_dir,'StrategyProcessed');
 fig_dir=fullfile(base_dir,'Figures');
 fig_trans_dir=fullfile(fig_dir,'Transition');
@@ -10,14 +11,14 @@ end
 
 % Define the strategy column names (adjust names if needed)
 strategyNames = {'thigmotaxis','circling','random_path','scanning',...
-    'chaining','directed_search','corrected_search','direct_path','perseverance'};
+    'chaining','directed_search','corrected_search','direct_path'};
 nStrategies = numel(strategyNames);
 
 strategy_titles={'Thigmotaxis','Circling','Random Path','Scanning',...
-    'Chaining','Directed Search','Corrected Search','Direct Path','Perseverance'};
+    'Chaining','Directed Search','Corrected Search','Direct Path'};
 %Load data from Excel files
 data1 = readtable(fullfile(base_dir,'MWM_results.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
-%% CHECK FOR CONSISTENCY in datasets (Trial no and full values)
+%CHECK FOR CONSISTENCY in datasets (Trial no and full values)
 
 %--- For data1: Check that each unique x_TargetID has 24 unique trials ---
 grp1 = varfun(@(x) numel(unique(x)), data1, 'GroupingVariables', 'x_TargetID', 'InputVariables', 'x_Trial');
@@ -114,23 +115,22 @@ end
 data2 = data2(keepIdx, :);
 
 
+%% COLORS
+oldColor=[0.4157,0.1059,0.6039]; %green
+ youngColor=[0.2196,0.5569,0.2353];% purple
 %% Transition Probabilities: Define Strategies and Separate Data by Age
-strategyNames = {'thigmotaxis','circling','random_path','scanning',...
-    'chaining','directed_search','corrected_search','direct_path','perseverance'};
 numStrategies = length(strategyNames);
 
 % Separate data by Age group
 youngData = data1(strcmpi(data1.Age, 'young'), :);
 oldData   = data1(strcmpi(data1.Age, 'old'), :);
 
-% Get unique rat IDs for each group
+% Get unique rat IDs 
 youngRatIDs = unique(youngData.x_TargetID);
 oldRatIDs   = unique(oldData.x_TargetID);
-
-% Assume days are numeric; determine total number of days
 totalDays = max(data1.Day);
 
-%% Compute Daily Within-Day Transitions for Young Rats
+%% Compute Daily Within-Day Transitions for  Rats
 % Two cell arrays: one for discrete transitions, one for probabilistic transitions.
 youngDailyDiscreteTrans = cell(length(youngRatIDs), totalDays);
 youngDailyProbTrans     = cell(length(youngRatIDs), totalDays);
@@ -215,64 +215,454 @@ for i = 1:length(oldRatIDs)
     end
 end
 
-%% Aggregate Daily Transition Matrices (Averaging Across Rats)
+%% Avg Transition matrices by rat across days
 % Initialize aggregated cell arrays for both groups
 youngAggDiscrete = cell(totalDays, 1);
 oldAggDiscrete   = cell(totalDays, 1);
 youngAggProb     = cell(totalDays, 1);
 oldAggProb       = cell(totalDays, 1);
+% Old method - did not normalize all rows to 1
+% for d = 1:totalDays
+%     %Aggregate Young Group
+%     count = 0;
+%     aggDisc = zeros(numStrategies, numStrategies);
+%     for i = 1:length(youngRatIDs)
+%          M = youngDailyDiscreteTrans{i, d};
+%          if ~any(isnan(M(:)))
+%              aggDisc = aggDisc + M;
+%              count = count + 1;
+%          end
+%     end
+%     if count > 0, aggDisc = aggDisc / count; end
+%     youngAggDiscrete{d} = aggDisc;
+% 
+%     count = 0;
+%     aggProb = zeros(numStrategies, numStrategies);
+%     for i = 1:length(youngRatIDs)
+%          M = youngDailyProbTrans{i, d};
+%          if ~any(isnan(M(:)))
+%              aggProb = aggProb + M;
+%              count = count + 1;
+%          end
+%     end
+%     if count > 0, aggProb = aggProb / count; end
+%     youngAggProb{d} = aggProb;
+% 
+%     %Aggregate Old Group
+%     count = 0;
+%     aggDisc = zeros(numStrategies, numStrategies);
+%     for i = 1:length(oldRatIDs)
+%          M = oldDailyDiscreteTrans{i, d};
+%          if ~any(isnan(M(:)))
+%              aggDisc = aggDisc + M;
+%              count = count + 1;
+%          end
+%     end
+%     if count > 0, aggDisc = aggDisc / count; end
+%     oldAggDiscrete{d} = aggDisc;
+% 
+%     count = 0;
+%     aggProb = zeros(numStrategies, numStrategies);
+%     for i = 1:length(oldRatIDs)
+%          M = oldDailyProbTrans{i, d};
+%          if ~any(isnan(M(:)))
+%              aggProb = aggProb + M;
+%              count = count + 1;
+%          end
+%     end
+%     if count > 0, aggProb = aggProb / count; end
+%     oldAggProb{d} = aggProb;
+% end
+
+% New method only for discrete strategies
 
 for d = 1:totalDays
-    %Aggregate Young Group
-    count = 0;
-    aggDisc = zeros(numStrategies, numStrategies);
-    for i = 1:length(youngRatIDs)
-         M = youngDailyDiscreteTrans{i, d};
-         if ~any(isnan(M(:)))
-             aggDisc = aggDisc + M;
-             count = count + 1;
-         end
+    % --- Young aggregate ---
+    % Build a 3D array [strategy x strategy x rat]
+    YM = nan(numStrategies, numStrategies, nYoung);
+    for i = 1:nYoung
+        YM(:,:,i) = youngDailyDiscreteTrans{i, d};
     end
-    if count > 0, aggDisc = aggDisc / count; end
-    youngAggDiscrete{d} = aggDisc;
-    
-    count = 0;
-    aggProb = zeros(numStrategies, numStrategies);
-    for i = 1:length(youngRatIDs)
-         M = youngDailyProbTrans{i, d};
-         if ~any(isnan(M(:)))
-             aggProb = aggProb + M;
-             count = count + 1;
-         end
+    % Element‐wise mean across rats, ignoring NaNs
+    A = nanmean(YM, 3);
+    % Optional: re‐normalize each row to sum to 1
+    rowSums = sum(A, 2);
+    A = bsxfun(@rdivide, A, rowSums + eps);
+    youngAggDiscrete{d} = A;
+
+    % --- Old aggregate ---
+    OM = nan(numStrategies, numStrategies, nOld);
+    for i = 1:nOld
+        OM(:,:,i) = oldDailyDiscreteTrans{i, d};
     end
-    if count > 0, aggProb = aggProb / count; end
-    youngAggProb{d} = aggProb;
-    
-    %Aggregate Old Group
-    count = 0;
-    aggDisc = zeros(numStrategies, numStrategies);
-    for i = 1:length(oldRatIDs)
-         M = oldDailyDiscreteTrans{i, d};
-         if ~any(isnan(M(:)))
-             aggDisc = aggDisc + M;
-             count = count + 1;
-         end
-    end
-    if count > 0, aggDisc = aggDisc / count; end
-    oldAggDiscrete{d} = aggDisc;
-    
-    count = 0;
-    aggProb = zeros(numStrategies, numStrategies);
-    for i = 1:length(oldRatIDs)
-         M = oldDailyProbTrans{i, d};
-         if ~any(isnan(M(:)))
-             aggProb = aggProb + M;
-             count = count + 1;
-         end
-    end
-    if count > 0, aggProb = aggProb / count; end
-    oldAggProb{d} = aggProb;
+    B = nanmean(OM, 3);
+    rowSums = sum(B, 2);
+    B = bsxfun(@rdivide, B, rowSums + eps);
+    oldAggDiscrete{d} = B;
 end
+%% KL Divergence calculation
+% Compute KL on discrete transitions ——— %%
+epsKL = 1e-12;
+klDiv = @(P,Q) nansum( P(:) .* log2( (P(:)+epsKL) ./ (Q(:)+epsKL) ) );
+
+nInt      = totalDays - 1;
+nYoung    = numel(youngRatIDs);
+nOld      = numel(oldRatIDs);
+
+KL_youngD = NaN(nYoung, nInt);
+KL_oldD   = NaN(nOld,   nInt);
+
+% Young discrete
+for i = 1:nYoung
+    for d = 1:nInt
+        P = youngDailyDiscreteTrans{i, d};
+        Q = youngDailyDiscreteTrans{i, d+1};
+        if all(~isnan(P(:))) && all(~isnan(Q(:)))
+            KL_youngD(i, d) = klDiv(P, Q);
+        end
+    end
+end
+
+% Old discrete
+for i = 1:nOld
+    for d = 1:nInt
+        P = oldDailyDiscreteTrans{i, d};
+        Q = oldDailyDiscreteTrans{i, d+1};
+        if all(~isnan(P(:))) && all(~isnan(Q(:)))
+            KL_oldD(i, d) = klDiv(P, Q);
+        end
+    end
+end
+
+% Build table for mixed‐design ANOVA ——— %%
+% Combine into one matrix and add Age as between‐subject factor
+allKL_D = [KL_youngD; KL_oldD];
+Age      = [ repmat({'young'}, nYoung, 1)
+             repmat({'old'},   nOld,   1) ];
+
+varNames = strcat('Int', string(1:nInt));  % {'Int1','Int2',…}
+
+TklD = array2table(allKL_D, 'VariableNames', varNames);
+TklD.Age = Age;
+
+%Run the mixed‐design ANOVA and Tukey post‐hoc ——— %%
+anovaKL_D   = runMixedANOVA(   TklD, varNames, 'Interval');
+disp(anovaKL_D)
+postHocKL_D = runTukeyPostHocMixed(TklD, varNames);
+
+
+
+%% Shannon Entropy
+uniqueDays = sort( unique(data1.Day) );
+nDays      = numel(uniqueDays);
+nYoung     = numel(youngRatIDs);
+nOld       = numel(oldRatIDs);
+
+H_young = NaN(nYoung, nDays);
+H_old   = NaN(nOld,   nDays);
+
+% ---- Young
+for r = 1:nYoung
+    for dIdx = 1:nDays
+        day = uniqueDays(dIdx);
+        P   = youngDailyDiscreteTrans{r, day};
+        if all(~isnan(P(:)))
+            H_young(r,dIdx) = matrixEntropy(P);
+        end
+    end
+end
+
+% ---- Old
+for r = 1:nOld
+    for dIdx = 1:nDays
+        day = uniqueDays(dIdx);
+        P   = oldDailyDiscreteTrans{r, day};
+        if all(~isnan(P(:)))
+            H_old(r,dIdx) = matrixEntropy(P);
+        end
+    end
+end
+
+%-Bonferroni Day-to-day comparisons (all rats pooled) 
+allH   = [H_young; H_old];
+pairs  = nchoosek(1:nDays,2);
+rawP   = zeros(size(pairs,1),1);
+for k = 1:numel(rawP)
+    [~, rawP(k)] = ttest( allH(:,pairs(k,1)), allH(:,pairs(k,2)) );
+end
+bonfP = min(rawP * numel(rawP), 1);
+
+fprintf('\nPairwise day comparisons (Bonferroni corrected)\n');
+for k = 1:numel(rawP)
+    fprintf(' Day %d vs %d : p = %.4f\n', ...
+        uniqueDays(pairs(k,1)), uniqueDays(pairs(k,2)), bonfP(k));
+end
+
+% Bonferroni Young vs Old for each day
+pAge_raw  = nan(1,nDays);
+for dIdx = 1:nDays
+    [~, pAge_raw(dIdx)] = ttest2( H_young(:,dIdx), H_old(:,dIdx), 'Vartype','unequal' );
+end
+pAge_bonf = min(pAge_raw * nDays, 1);
+
+fprintf('\nYoung vs Old per day (Bonferroni corrected)\n');
+for dIdx = 1:nDays
+    fprintf(' Day %d : p = %.4f\n', uniqueDays(dIdx), pAge_bonf(dIdx));
+end
+
+%-Mixed-design ANOVA
+varNames = strcat('Day', string(uniqueDays));
+T_H      = array2table([H_young; H_old], 'VariableNames', varNames);
+T_H.Age  = [repmat({'young'},nYoung,1); repmat({'old'},nOld,1)];
+
+anovaEntropy   = runMixedANOVA(T_H, varNames, 'Day');
+postHocEntropy = runTukeyPostHocMixed(T_H, varNames);
+
+disp(anovaEntropy)
+
+%--------------4) Plot means ± SEM
+meanY = nanmean(H_young,1);                          % dim=1
+semY  = nanstd (H_young,0,1) ./ sqrt(sum(~isnan(H_young),1));
+meanO = nanmean(H_old,1);
+semO  = nanstd (H_old,0,1) ./ sqrt(sum(~isnan(H_old),1));
+
+f1=figure;
+hold on
+errorbar(1:nDays, meanY, semY, 'o-','LineWidth',4,'Color',youngColor);
+errorbar(1:nDays, meanO, semO, 'o-','LineWidth',4,'Color',oldColor);
+xticks(1:nDays); xticklabels(string(uniqueDays));
+xlabel('Day'); ylabel('Shannon entropy');
+legend('Young','Old','Location','northeast');
+xlim([0.9 4.1])
+ylim([1.5 2.6])
+%title('Average Entropy of Discrete-Transition Matrices');
+pubify_figure_axis_robust(16,16)
+exportgraphics(f1, fullfile(fig_trans_dir, 'Per_RatTransitionEntropy.png'), ...
+     'Resolution', 450); 
+%----------------- Plot all rats 
+% f2=figure('Position',[100 100 800 400]); hold on
+% x = 1:nDays;
+% 
+% % --- Young rats (faint lines) ---
+% for r = 1:nYoung
+%     plot( x, H_young(r,:), '-', 'Color',[youngColor 0.25], 'LineWidth',1 );
+% end
+% % mean line
+% plot( x, meanY, '-o', 'Color',youngColor, 'LineWidth',2, 'MarkerFaceColor',youngColor );
+% 
+% % --- Old rats ---
+% for r = 1:nOld
+%     plot( x, H_old(r,:), '-', 'Color',[oldColor 0.25], 'LineWidth',1 );
+% end
+% plot( x, meanO, '-s', 'Color',oldColor, 'LineWidth',2, 'MarkerFaceColor',oldColor );
+% 
+% xticks(x); xticklabels(string(uniqueDays));
+% xlabel('Day'); ylabel('Shannon entropy (bits)');
+% legend({'Young rats','Mean Young','Old rats','Mean Old'},'Location','best');
+% title('Per-rat entropy trajectories with group means');
+% pubify_figure_axis_robust(14,14);
+% exportgraphics(f2, fullfile(fig_trans_dir, sprintf('RatTransitionEntropy_%s.png', ag)), ...
+%     'Resolution', 450);  % Set to 300 DPI
+% %------------------- Bar Plots
+% f3=figure('Position',[150 150 800 400]); hold on
+% 
+% barWidth = 0.35;
+% offset   = 0.17;         % horizontal offset for young vs old points
+% for dIdx = 1:nDays
+%     % ---- bars ----
+%     bar(dIdx-offset, meanY(dIdx), barWidth, 'FaceColor', youngColor, 'FaceAlpha',0.3);
+%     bar(dIdx+offset, meanO(dIdx), barWidth, 'FaceColor', oldColor,   'FaceAlpha',0.3);
+% 
+%     % error bars (SEM)
+%     errorbar(dIdx-offset, meanY(dIdx), semY(dIdx), 'k', 'LineStyle','none', 'LineWidth',1);
+%     errorbar(dIdx+offset, meanO(dIdx), semO(dIdx), 'k', 'LineStyle','none', 'LineWidth',1);
+% 
+%     % ---- scatter every rat ----
+%     jitter = 0.04;
+%     scatter( dIdx-offset + jitter*randn(nYoung,1), H_young(:,dIdx), 30, ...
+%              'MarkerEdgeColor','none','MarkerFaceColor',youngColor);
+%     scatter( dIdx+offset + jitter*randn(nOld,1),   H_old(:,dIdx),   30, ...
+%              'MarkerEdgeColor','none','MarkerFaceColor',oldColor);
+% end
+% 
+% xticks(x); xticklabels(string(uniqueDays));
+% xlabel('Day'); ylabel('Shannon entropy (bits)');
+% legend({'Mean Young','Mean Old'},'Location','best');
+% title('Transition Matrix Entropy Calculation');
+% pubify_figure_axis_robust(14,14);
+% exportgraphics(f3, fullfile(fig_trans_dir, 'Bar_RatTransitionEntropy.png'), ...
+%     'Resolution', 450);  % Set to 300 DPI
+
+%% Calculate Entropy on Aggregate Matrix
+H_young_all = nan(1,nDays);
+H_old_all   = nan(1,nDays);
+
+for dIdx = 1:nDays
+    % pull out the aggregated discrete‐transition matrix for that day
+    P_y = youngAggDiscrete{dIdx};
+    P_o = oldAggDiscrete{dIdx};
+
+    % now simply call the fixed matrixEntropy
+    H_young_all(dIdx) = matrixEntropy(P_y);
+    H_old_all(dIdx)   = matrixEntropy(P_o);
+end
+
+% plot
+f4=figure; hold on
+errorbar(1:nDays, H_young_all, zeros(1,nDays), 'o-','LineWidth',2,'Color',youngColor);
+errorbar(1:nDays, H_old_all,   zeros(1,nDays),   'o-','LineWidth',2,'Color',oldColor);
+xticks(1:nDays); xticklabels(string(uniqueDays));
+xlabel('Day'); ylabel('Entropy (bits)');
+legend('Young','Old','Location','northeast');
+xlim([0.9 4.1])
+%ylim([1 2.4])
+title('Entropy of The Aggregated Discrete Transition Matrix');
+pubify_figure_axis_robust(15,15)
+exportgraphics(f4, fullfile(fig_trans_dir, 'Agg_RatTransitionEntropy.png'), ...
+     'Resolution', 450); 
+
+%% ——— Compute Spectral Gap & Stationary‐Distribution Entropy per Rat per Day ——— %%
+epsEnt = 1e-12;    % to guard against log2(0)
+
+nYoung = numel(youngRatIDs);
+nOld   = numel(oldRatIDs);
+nDays  = totalDays;
+
+gap_young = NaN(nYoung, nDays);
+gap_old   = NaN(nOld,   nDays);
+H_young   = NaN(nYoung, nDays);
+H_old     = NaN(nOld,   nDays);
+
+for i = 1:nYoung
+    for d = 1:nDays
+        P = youngDailyDiscreteTrans{i,d};
+        if all(~isnan(P(:)))
+            % Spectral gap
+            ev   = eig(P);
+            lam  = sort(abs(ev), 'descend');
+            gap_young(i,d) = 1 - lam(2);
+
+            %Stationary distribution entropy
+            [V,D] = eig(P.');
+            % find eigenvalue closest to 1
+            [~, idx] = min(abs(diag(D) - 1));
+            pi = real(V(:,idx));
+            pi = pi / sum(pi);              % normalize
+            % clip any small negatives and renormalize
+            pi(pi<0) = 0;
+            pi = pi / sum(pi);
+            H_young(i,d) = -sum(pi .* log2(pi + epsEnt));
+        end
+    end
+end
+
+for i = 1:nOld
+    for d = 1:nDays
+        P = oldDailyDiscreteTrans{i,d};
+        if all(~isnan(P(:)))
+            ev   = eig(P);
+            lam  = sort(abs(ev), 'descend');
+            gap_old(i,d) = 1 - lam(2);
+
+            [V,D] = eig(P.');
+            [~, idx] = min(abs(diag(D) - 1));
+            pi = real(V(:,idx));
+            pi = pi / sum(pi);
+            pi(pi<0) = 0;
+            pi = pi / sum(pi);
+            H_old(i,d) = -sum(pi .* log2(pi + epsEnt));
+        end
+    end
+end
+
+%——— Assemble Tables for ANOVA ——— %%
+allGap = [gap_young; gap_old];
+allH   = [H_young;   H_old];
+Age    = [ repmat({'young'},nYoung,1); repmat({'old'},nOld,1) ];
+dayVars = strcat('Day', string(1:nDays));
+
+T_gap = array2table(allGap, 'VariableNames', dayVars);
+T_gap.Age = Age;
+
+T_ent = array2table(allH, 'VariableNames', dayVars);
+T_ent.Age = Age;
+
+%——— Run Mixed‐Design ANOVAs ——— %%
+anovaGap = runMixedANOVA(   T_gap, dayVars, 'Day');
+
+anovaEnt = runMixedANOVA(   T_ent, dayVars, 'Day');
+disp(anovaEnt)
+
+% Optional Tukey post‐hoc
+postHocGap = runTukeyPostHocMixed(T_gap, dayVars);
+postHocEnt = runTukeyPostHocMixed(T_ent, dayVars);
+
+% ——— Between‐Age T‐Tests on Stationary‐Distribution Entropy ——— %%
+pEntDay    = nan(1, nDays);
+for dIdx = 1:nDays
+    y = H_young(:,dIdx);
+    o = H_old(:,  dIdx);
+    % unequal‐variance two‐sample t‐test
+    [~, pEntDay(dIdx)] = ttest2(y, o, 'Vartype','unequal');
+end
+
+% Bonferroni correction across nDays tests
+pEntDay_bonf = min(pEntDay * nDays, 1);
+
+fprintf('\nStationary‐Distribution Entropy: Young vs Old per day\n');
+for dIdx = 1:nDays
+    day = uniqueDays(dIdx);
+    fprintf(' Day %d: p = %.4f   (Bonferroni p = %.4f)\n', ...
+            day, pEntDay(dIdx), pEntDay_bonf(dIdx));
+end
+
+
+figure; hold on
+errorbar(1:nDays, nanmean(H_young), nanstd(H_young)./sqrt(nYoung), 'o-','LineWidth',2,'Color',youngColor);
+errorbar(1:nDays, nanmean(H_old),   nanstd(H_old)./sqrt(nOld),   'o-','LineWidth',2,'Color',oldColor);
+xticks(1:nDays);
+xticklabels(string(uniqueDays));
+xlabel('Day');
+ylabel('Stationary Distribution');
+legend('Young','Old','Location','best');
+grid on;
+title('Stationary Distribtuion of Discrete Transition Matrices');
+
+%% Entropy on Probability Transition  Matrix
+% Get your actual days
+uniqueDays = sort(unique(data1.Day));
+nDays      = numel(uniqueDays);
+
+% Compute means ± SEM
+meanGapY = nanmean(gap_young,1);
+semGapY  = nanstd(gap_young,[],1)./sqrt(sum(~isnan(gap_young),1));
+meanGapO = nanmean(gap_old,  [],1);
+semGapO  = nanstd(gap_old,  [],1)./sqrt(sum(~isnan(gap_old),1));
+
+meanHY   = nanmean(H_young, 1);
+semHY    = nanstd(H_young,  [],1)./sqrt(sum(~isnan(H_young),1));
+meanHO   = nanmean(H_old,    1);
+semHO    = nanstd(H_old,    [],1)./sqrt(sum(~isnan(H_old),1));
+
+% ---- Figure 1: Spectral Gap ----
+figure; hold on
+errorbar(1:nDays, meanGapY, semGapY, 'o-','LineWidth',1.5);
+errorbar(1:nDays, meanGapO, semGapO, 's--','LineWidth',1.5);
+xticks(1:nDays); xticklabels(string(uniqueDays));
+xlabel('Day'); ylabel('Spectral gap (1 - |\lambda_2|)');
+legend('Young','Old','Location','best');
+title('Spectral gap by Day and Age');
+grid on
+
+% ---- Figure 2: Stationary‐Distribution Entropy ----
+figure; hold on
+errorbar(1:nDays, meanHY, semHY, 'o-','LineWidth',1.5);
+errorbar(1:nDays, meanHO, semHO, 's--','LineWidth',1.5);
+xticks(1:nDays); xticklabels(string(uniqueDays));
+xlabel('Day'); ylabel('Entropy of \pi (bits)');
+legend('Young','Old','Location','best');
+title('Stationary‐Distribution Entropy by Day and Age');
+grid on
 
 %% Repeated Measures ANOVA and Tukey Post Hoc for a Specific Transition
 % CURRENTLY ONLY ONE STRATEGY 
@@ -312,26 +702,62 @@ postHocResults = runTukeyPostHocMixed(T, strcat('Day', string(1:totalDays)));
 
 %% Plotting: Transition Probabilities as Heat Maps
 % Example: Plot aggregated heat maps for young rats 
-f1=figure('Position', [100, 100, 2200, 1200]);
+ oldColor=[0.4157,0.1059,0.6039]; %purple
+ youngColor=[0.2196,0.5569,0.2353];% green
+% Generate colormaps with increasing intensity (light to dark)
+nShades = 256;
+youngCMap = [linspace(1, youngColor(1), nShades)', ...
+             linspace(1, youngColor(2), nShades)', ...
+             linspace(1, youngColor(3), nShades)'];
+
+oldCMap = [linspace(1, oldColor(1), nShades)', ...
+           linspace(1, oldColor(2), nShades)', ...
+           linspace(1, oldColor(3), nShades)'];
+f1=figure('Position',[-2505,-898,2063,1103]);
 for d = 1:totalDays
-    % Discrete transitions heat map
+    % --- Young Group Heatmap ---
     subplot(2, totalDays, d);
     h1 = heatmap(strategy_titles, strategy_titles, youngAggDiscrete{d});
-    h1.Title = ['Young: Day' num2str(d)];
-    h1.XLabel = 'Next Strategy';
-    h1.YLabel = 'Current Strategy';
-    clim([0 0.5])
-    %Old
-    subplot(2, totalDays, d+totalDays);
-    h1 = heatmap(strategy_titles, strategy_titles, oldAggDiscrete{d});
-    h1.Title = ['Old: Day' num2str(d)];
-    h1.XLabel = 'Next Strategy';
-    h1.YLabel = 'Current Strategy';
-    clim([0 0.5])
-   
+    h1.Title = ['Day ' num2str(d)];
+    h1.XLabel = '\bfNext Strategy';
+    h1.FontSize = 14;
+    h1.ColorLimits = [0 0.5];
+    h1.GridVisible = 'on';
+    h1.CellLabelColor = 'black';
+    h1.Colormap = youngCMap;
+
+    if d == 1
+        h1.YLabel = '\bfCurrent Strategy';
+    else
+        h1.YLabel = '';
+    end
+
+    % Only show colorbar for last day
+    h1.ColorbarVisible = (d == totalDays);
+
+    % --- Old Group Heatmap ---
+    subplot(2, totalDays, d + totalDays);
+    h2 = heatmap(strategy_titles, strategy_titles, oldAggDiscrete{d});
+    h2.Title = [' Day ' num2str(d)];
+    h2.XLabel = '\bfNext Strategy';
+    h2.FontSize = 14;
+    h2.ColorLimits = [0 0.5];
+    h2.GridVisible = 'on';
+    
+    h2.CellLabelColor = 'black';
+    h2.Colormap = oldCMap;
+
+    if d == 1
+        h2.YLabel = '\bfCurrent Strategy';
+    else
+        h2.YLabel = '';
+    end
+
+    h2.ColorbarVisible = (d == totalDays);
 end
-sgtitle('Discrete Strategy Transition Probabilities')
-saveas(f1,fullfile(fig_trans_dir,'DiscreteTransitionProbabilities'),'png');
+
+sgtitle('Strategy Transition Probabilities', 'FontSize', 18, 'FontWeight', 'bold');
+saveas(f1, fullfile(fig_trans_dir, 'DiscreteTransitionProbabilities'), 'png');
 close;
  % Probabilistic transitions heat map
 f2=figure('Position', [100, 100, 2200, 1200]);
@@ -354,6 +780,73 @@ sgtitle('Strategy Confidence Intervals in a Transition Matrix ')
 saveas(f2,fullfile(fig_trans_dir,'ConfidenceIntervalTransitionProbabilities'),'png');
 close;
 
+%% HEAT MAP Prob Transition Matrix
+f1=figure('Position',[-2505,-898,2063,1103]);
+for d = 1:totalDays
+    % --- Young Group Heatmap ---
+    subplot(2, totalDays, d);
+    h1 = heatmap(strategy_titles, strategy_titles, youngAggProb{d});
+    h1.Title = ['Day ' num2str(d)];
+    h1.XLabel = '\bfNext Strategy';
+    h1.FontSize = 14;
+    h1.ColorLimits = [0 0.5];
+    h1.GridVisible = 'on';
+    h1.CellLabelColor = 'black';
+    h1.Colormap = youngCMap;
+
+    if d == 1
+        h1.YLabel = '\bfCurrent Strategy';
+    else
+        h1.YLabel = '';
+    end
+
+    % Only show colorbar for last day
+    h1.ColorbarVisible = (d == totalDays);
+
+    % --- Old Group Heatmap ---
+    subplot(2, totalDays, d + totalDays);
+    h2 = heatmap(strategy_titles, strategy_titles, oldAggProb{d});
+    h2.Title = [' Day ' num2str(d)];
+    h2.XLabel = '\bfNext Strategy';
+    h2.FontSize = 14;
+    h2.ColorLimits = [0 0.5];
+    h2.GridVisible = 'on';
+    
+    h2.CellLabelColor = 'black';
+    h2.Colormap = oldCMap;
+
+    if d == 1
+        h2.YLabel = '\bfCurrent Strategy';
+    else
+        h2.YLabel = '';
+    end
+
+    h2.ColorbarVisible = (d == totalDays);
+end
+
+sgtitle('Strategy Transition Probabilities', 'FontSize', 18, 'FontWeight', 'bold');
+saveas(f1, fullfile(fig_trans_dir, 'ProbTransitionProbabilities'), 'png');
+close;
+ % Probabilistic transitions heat map
+% f3=figure('Position', [100, 100, 2200, 1200]);
+% for d = 1:totalDays
+% 
+%     subplot(2, totalDays, d);
+%     h1 = heatmap(strategy_titles, strategy_titles, youngAggProb{d});
+%     h1.Title = ['Young: Day' num2str(d)];
+%     h1.XLabel = 'Next Trial';
+%     h1.YLabel = 'Current Trial';
+%     clim([0 0.4])
+%     subplot(2, totalDays, d+totalDays);
+%     h2 = heatmap(strategy_titles, strategy_titles, oldAggProb{d});
+%     h2.Title = ['Old: Day' num2str(d)];
+%     h2.XLabel = 'Next Trial';
+%     h2.YLabel = 'Current Trial';
+%     clim([0 0.4])
+% end
+% sgtitle('Strategy Confidence Intervals in a Transition Matrix ')
+% saveas(f3,fullfile(fig_trans_dir,'Prob_TrnsitionMatrix'),'png');
+% close;
 
 %% Plotting: Transitions Matrix - Network Graph
 % Get unique days from the data
@@ -414,7 +907,7 @@ for d = 1:nDays
     if ~isempty(G_young_day.Edges)
         LWidths = 1 + 5 * G_young_day.Edges.Weight / max(G_young_day.Edges.Weight);
         edgeLabels = round(G_young_day.Edges.Weight * 100) / 100;
-        p = plot(G_young_day, 'EdgeLabel', edgeLabels, 'LineWidth', LWidths);
+        p = plot(G_young_day, 'LineWidth', LWidths);
         p.NodeColor = youngColor;
         p.NodeFontSize = 10;
         p.EdgeColor = youngColor;
@@ -435,7 +928,7 @@ for d = 1:nDays
     if ~isempty(G_old_day.Edges)
         LWidths = 1 + 5 * G_old_day.Edges.Weight / max(G_old_day.Edges.Weight);
         edgeLabels = round(G_old_day.Edges.Weight * 100) / 100;
-        p = plot(G_old_day, 'EdgeLabel', edgeLabels, 'LineWidth', LWidths);
+        p = plot(G_old_day,  'LineWidth', LWidths);
         p.NodeColor = oldColor;
         p.NodeFontSize = 10;
         p.EdgeColor = oldColor;
@@ -672,69 +1165,3 @@ ylabel('Average Transition Probability');
 title('Old: Time Series of Strategy Use');
 legend(strategy_titles, 'Location', 'best');
 grid on;
-%% HEATMAP Colored by group
-strategyGroups = {
-    {'thigmotaxis','circling','random_path'}, 'Non-Goal Oriented';
-    {'scanning','chaining'}, 'Procedural';
-    {'directed_search','corrected_search','direct_path','perseverance'}, 'Allocentric'
-};
-% Map groups to colors
-colorMapping = containers.Map();
-colorMapping('Non-Goal Oriented') = 'red';
-colorMapping('Procedural') = 'blue';
-colorMapping('Allocentric') = 'green';
-
- Map groups to colors
-colorMapping = containers.Map();
-colorMapping('Non-Goal Oriented') = 'red';
-colorMapping('Procedural') = 'blue';
-colorMapping('Allocentric') = 'green';
-
-% Create a map from strategy to its group color
-strategyColorMap = containers.Map();
-for k = 1:size(strategyGroups, 1)
-    groupStrategies = strategyGroups{k, 1};
-    groupColor = colorMapping(strategyGroups{k, 2};
-    for j = 1:length(groupStrategies)
-        strategyColorMap(groupStrategies{j}) = groupColor;
-    end
-end
-
-% Create the heatmap
-h = heatmap(strategy_titles, strategy_titles, data);
-
-
-% Plot aggregated discrete transition heat maps for both groups.
-f1 = figure('Position', [100, 100, 2200, 1200]);
-for d = 1:totalDays
-    % Young Group Heat Map
-    subplot(2, totalDays, d);
-    h1 = heatmap(strategy_titles, strategy_titles, youngAggDiscrete{d});
-    h1.Title = ['Young: Day ' num2str(d)];
-    h1.XLabel = 'Next Strategy';
-    h1.YLabel = 'Current Strategy';
-    % Set color limits
-    % Retrieve the underlying axes
-    ax = struct(h).Axes;
-    
-    % Apply colored labels using TeX markup
-    ax.XTickLabel = cellfun(@(x) ['\color{' strategyColorMap(x) '} ' x], strategy_titles, 'UniformOutput', false);
-    ax.YTickLabel = cellfun(@(x) ['\color{' strategyColorMap(x) '} ' x], strategy_titles, 'UniformOutput', false);
-    
-    % Ensure the interpreter is set to TeX
-    set(ax, 'TickLabelInterpreter', 'tex');
-
-    
-    % Old Group Heat Map
-    subplot(2, totalDays, d+totalDays);
-    h2 = heatmap(strategy_titles, strategy_titles, oldAggDiscrete{d});
-    h2.Title = ['Old: Day ' num2str(d)];
-    h2.XLabel = 'Next Strategy';
-    h2.YLabel = 'Current Strategy';
-    h2.ColorLimits = [0 0.5];
-    h2.XDisplayLabels = coloredLabels;
-    h2.YDisplayLabels = coloredLabels;
-end
-sgtitle('Discrete Strategy Transition Probabilities');
-saveas(f1, fullfile(fig_trans_dir, 'DiscreteTransitionProbabilities'), 'png');
-close;

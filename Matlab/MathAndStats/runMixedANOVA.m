@@ -23,6 +23,7 @@ end
 
 numLevels = numel(measureVars);
 withinDesign = table((1:numLevels)', 'VariableNames', {factorName});
+withinDesign.(factorName) = categorical(withinDesign.(factorName));
 formula = sprintf('%s-%s ~ Age', measureVars{1}, measureVars{end});
 rm = fitrm(tbl, formula, 'WithinDesign', withinDesign);
 anovaResults = ranova(rm, 'WithinModel', factorName);
