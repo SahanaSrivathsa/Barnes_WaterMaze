@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load the Excel file
-input_file = '/Users/miasponseller/Desktop/CAS_AllRats_Spatial.csv'
+input_file = '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/CAS_AllRats_Spatial.csv'
 df = pd.read_excel(input_file)
 
 # Create new columns
@@ -14,6 +14,7 @@ df['_Day'] = ((df['Trial'] - 1) // 6 + 1).clip(upper=4)
 
 df['_TrackFileFormat'] = 'anymaze.csv'
 df['Age'] = df['Age']
+df['Performance'] = df['Performance']
 df['Cohort'] = df['Cohort']
 df['_Arena'] = 'Cohort' + df['Cohort'].astype(str) + 'Arena.txt'
 df['_TrackFile'] = 'Coh' + df['Cohort'].astype(str) + '_Trial' + df['Test'].astype(str)
@@ -26,7 +27,7 @@ output_columns = [
 output_df = df[output_columns]
 
 # Save to new Excel file
-output_file = '/Users/miasponseller/Desktop/All_Rats_CAS.xlsx'
+output_file = '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/CAS_exp_desc.xlsx'
 output_df.to_excel(output_file, index=False)
 
 print(f"Saved transformed data to {output_file}")
