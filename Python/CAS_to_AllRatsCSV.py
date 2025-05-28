@@ -5,12 +5,12 @@ import re
 
 # folder with CAS files and output file path
 cas_folder = '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Split Spatial Sheets'
-output_file = '/Users/miasponseller/Desktop/CAS_AllRats_Spatial.csv'
+output_file = '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/CAS_AllRats_Spatial.csv'
 
 # performance sheets
-young = pd.read_excel('/Users/miasponseller/Desktop/2023-01-18_Rats_New_age_6.xlsx')
-middle = pd.read_excel('/Users/miasponseller/Desktop/2023-01-18_Rats_New_age_15.xlsx')
-old = pd.read_excel('/Users/miasponseller/Desktop/2023-01-18_Rats_New_age_23.xlsx')
+young = pd.read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Performance Sheets/2023-01-18_Rats_New_age_6.xlsx')
+middle = pd.read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Performance Sheets/2023-01-18_Rats_New_age_15.xlsx')
+old = pd.read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Performance Sheets/2023-01-18_Rats_New_age_23.xlsx')
 
 # ID performance dictionaries
 young_perf_dict = young.set_index('ID')['performance'].to_dict()

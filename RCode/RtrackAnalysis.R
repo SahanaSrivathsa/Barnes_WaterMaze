@@ -6,19 +6,27 @@ library(ggplot2)
 library(data.table)
 
 # Rtrack folder file path (main directory)
-rtrack_folder <- "/Users/miasponseller/Desktop/Lab/Rtrack"
+rtrack_folder <- '/Users/miasponseller/Desktop/Lab/Rtrack/CAS'
 
 # Rat list file path (contains cohort, rat number, and age group)
 rat_list <- read.csv("/Users/miasponseller/Desktop/Lab/Rtrack/Rat_List.csv")
 
+# all trials folder
+all_trials <- '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/All CAS Tracks/'
+
 # Cohort list and their corresponding file paths
-cohort_list <- c(1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21) # Cohort numbers
+cohort_list <- c('1O', '1YM', '2M', '2O', '2Y', '3M', '3O', '3Y', '4M','4O', '4Y', 
+                 '5M', '5O', '5Y', '6M', '6O', '6Y', '7M', '7O', '7Y', '8M', '8O', 
+                 '8Y', '9M', '9O', '10O', '10YM', '11M', '11O', '11Y', '12O', 
+                 '12YM', '13OP', '13OR', '13YM', '14BR', '14P', '14RP', '14Bk', 
+                 '15BR', '15G', '16B', '16G', '16R') 
+
 cohort_file_paths <- sapply(cohort_list, function(cohort) {
   file.path(rtrack_folder, "Cohorts", paste0("Cohort", cohort))},
   USE.NAMES = FALSE)
 
 # all rats experiment description file (if exists, must be an .xlsx)
-all_rats_desc_fp <- file.path(rtrack_folder, "All_Rats.xlsx")
+all_rats_desc_fp <- file.path(rtrack_folder, "CAS_exp_desc.xlsx")
 
 
 # Add to or create AllRats.xlsx (all cohorts combined description file) ------------------------
@@ -134,17 +142,6 @@ process_single_path <- function(cohort_num, trial_num, output_folder = "/Users/m
 }
 
 
-# Bulk Experiment Processing ----------------------------------------------
-
-bulk_process_experiment <- function() {
-  for (cohort in cohort_list) {
-    desc_file <- file.path(cohort_file_paths[which(cohort_list == cohort)], paste0("cohort", cohort, "_exp_desc.xlsx"))
-    experiment <- Rtrack::read_experiment(desc_file, data.dir = file.path(cohort_file_paths[which(cohort_list == cohort)], "Trials"))
-  }
-}
-
-
-
 # Plot All Paths and Save -------------------------------------------------
 plot_all_paths <- function(cohort_list, output_folder = "/Users/miasponseller/Desktop/Lab/Rtrack/Plot_PDFs") {
   # Create output folder if it doesn't exist
@@ -216,9 +213,8 @@ plot_all_paths <- function(cohort_list, output_folder = "/Users/miasponseller/De
 
 bulk_strategy_calling <- function() {
   experiment_file <- all_rats_desc_fp
-  trials_dir <- "/Users/miasponseller/Desktop/Lab/Rtrack/All Trials"
   
-  experiment <<- Rtrack::read_experiment(experiment_file, data.dir = trials_dir)
+  experiment <<- Rtrack::read_experiment(experiment_file, data.dir = all_trials)
   strategies <<- Rtrack::call_strategy(experiment)
   list(experiment = experiment, strategies = strategies)
 }
@@ -288,7 +284,6 @@ bulk_density_map <- function() {
 
 #all_rats_experiment_desc_file(cohort_list, cohort_file_paths, rat_list, rtrack_folder)
 #process_single_path(1, 74)
-#bulk_process_experiment()
 #plot_all_paths(cohort_list)
 #bulk_strategy_calling() 
 strategy_plots()

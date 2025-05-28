@@ -2,13 +2,16 @@ library(openxlsx)
 library(readxl)
 library(Rtrack)
 
-rtrack_folder <- "/Users/miasponseller/Desktop/Lab/Rtrack" # Rtrack folder file path (main directory)
-all_rats_desc_fp <- file.path("/Users/miasponseller/Desktop/Lab/Rtrack/All_Rats.xlsx") # all rats experiment description file, must be an .xlsx
-trials_dir <- "/Users/miasponseller/Desktop/Lab/Rtrack/All Trials" # folder with all trials path data
-strat_export_fp <- paste0("/Users/miasponseller/Desktop/Lab/Rtrack/MWM_results_", format(Sys.Date(), "%m-%d-%Y"), ".xlsx") # output file path
+rtrack_folder <- "/Users/miasponseller/Desktop/Lab/Rtrack/CAS" # Rtrack folder file path (main directory)
+all_rats_desc_fp <- file.path('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/CAS_exp_desc.xlsx') # all rats experiment description file, must be an .xlsx
+trials_dir <- '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/All CAS Tracks' # folder with all cohorts' trials path data
+strat_export_fp <- paste0("/Users/miasponseller/Desktop/Lab/Rtrack/CAS/CAS_MWM_results_", format(Sys.Date(), "%m-%d-%Y"), ".xlsx") # output file path
 
-cohort_list <- c(1, 2, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
-
+cohort_list <- c('1O', '1YM', '2M', '2O', '2Y', '3M', '3O', '3Y', '4M','4O', '4Y', 
+                 '5M', '5O', '5Y', '6M', '6O', '6Y', '7M', '7O', '7Y', '8M', '8O', 
+                 '8Y', '9M', '9O', '10O', '10YM', '11M', '11O', '11Y', '12O', 
+                 '12YM', '13OP', '13OR', '13YM', '14BR', '14P', '14RP', '14Bk', 
+                 '15BR', '15G', '16B', '16G', '16R')
 
 bulk_strategy_calling <- function() {
   experiment <<- Rtrack::read_experiment(all_rats_desc_fp, data.dir = trials_dir)
