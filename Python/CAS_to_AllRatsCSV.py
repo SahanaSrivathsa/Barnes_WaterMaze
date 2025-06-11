@@ -1,5 +1,4 @@
 import pandas as pd
-
 import os
 import re
 
@@ -7,7 +6,7 @@ import re
 cas_folder = '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Split Spatial Sheets'
 output_file = '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/CAS_AllRats_Spatial.csv'
 
-# performance sheets
+# performance sheet
 young = pd.read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Performance Sheets/2023-01-18_Rats_New_age_6.xlsx')
 middle = pd.read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Performance Sheets/2023-01-18_Rats_New_age_15.xlsx')
 old = pd.read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Performance Sheets/2023-01-18_Rats_New_age_23.xlsx')
