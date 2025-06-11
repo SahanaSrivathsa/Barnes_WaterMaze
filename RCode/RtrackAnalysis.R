@@ -14,6 +14,9 @@ rat_list <- read.csv("/Users/miasponseller/Desktop/Lab/Rtrack/Rat_List.csv")
 # all trials folder
 all_trials <- '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/All CAS Tracks/'
 
+# all rats experiment description file (if exists, must be an .xlsx)
+all_rats_desc_fp <- file.path(rtrack_folder, "CAS_exp_desc.xlsx")
+
 # Cohort list and their corresponding file paths
 cohort_list <- c('1O', '1YM', '2M', '2O', '2Y', '3M', '3O', '3Y', '4M','4O', '4Y', 
                  '5M', '5O', '5Y', '6M', '6O', '6Y', '7M', '7O', '7Y', '8M', '8O', 
@@ -24,9 +27,6 @@ cohort_list <- c('1O', '1YM', '2M', '2O', '2Y', '3M', '3O', '3Y', '4M','4O', '4Y
 cohort_file_paths <- sapply(cohort_list, function(cohort) {
   file.path(rtrack_folder, "Cohorts", paste0("Cohort", cohort))},
   USE.NAMES = FALSE)
-
-# all rats experiment description file (if exists, must be an .xlsx)
-all_rats_desc_fp <- file.path(rtrack_folder, "CAS_exp_desc.xlsx")
 
 
 # Add to or create AllRats.xlsx (all cohorts combined description file) ------------------------
@@ -241,6 +241,8 @@ strategy_plots <- function() {
   
   # Strategy plots, by Age
   Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Age")
+  
+  print("Plots successfully created")
 }
 
 

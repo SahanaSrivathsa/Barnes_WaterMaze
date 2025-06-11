@@ -189,6 +189,44 @@ for i = 1:length(youngRatIDs)
     end
 end
 
+%Compute Daily Within-Day Transitions for Middle Rats
+middleDailyDiscreteTrans = cell(length(middleRatIDs), totalDays);
+middleDailyProbTrans     = cell(length(middleRatIDs), totalDays);
+
+for i = 1:length(middleRatIDs)
+    ratID = middleRatIDs(i);
+    ratData = middleData(strcmp(middleData.x_TargetID, ratID), :);
+    ratData = sortrows(ratData, {'x_Day', 'x_Trial'});
+    for d = 1:totalDays
+        dayData = ratData(ratData.x_Day == d, :);
+        if height(dayData) > 1
+            discMat = zeros(numStrategies, numStrategies);
+            probMat = zeros(numStrategies, numStrategies);
+            for t = 1:height(dayData)-1
+                currState = dayData.strategy(t);
+                nextState = dayData.strategy(t+1);
+                discMat(currState, nextState) = discMat(currState, nextState) + 1;
+                currProbs = table2array(dayData(t, strategyNames));
+                nextProbs = table2array(dayData(t+1, strategyNames));
+                probMat = probMat + (currProbs' * nextProbs);
+            end
+            for j = 1:numStrategies
+                if sum(discMat(j,:)) > 0
+                    discMat(j,:) = discMat(j,:) / sum(discMat(j,:));
+                end
+                if sum(probMat(j,:)) > 0
+                    probMat(j,:) = probMat(j,:) / sum(probMat(j,:));
+                end
+            end
+            middleDailyDiscreteTrans{i, d} = discMat;
+            middleDailyProbTrans{i, d}     = probMat;
+        else
+            middleDailyDiscreteTrans{i, d} = NaN(numStrategies, numStrategies);
+            middleDailyProbTrans{i, d}     = NaN(numStrategies, numStrategies);
+        end
+    end
+end
+
 %Compute Daily Within-Day Transitions for Old Rats
 oldDailyDiscreteTrans = cell(length(oldRatIDs), totalDays);
 oldDailyProbTrans     = cell(length(oldRatIDs), totalDays);
@@ -230,8 +268,10 @@ end
 %% Avg Transition matrices by rat across days
 % Initialize aggregated cell arrays for both groups
 youngAggDiscrete = cell(totalDays, 1);
+middleAggDiscrete = cell(totalDays, 1);
 oldAggDiscrete   = cell(totalDays, 1);
 youngAggProb     = cell(totalDays, 1);
+middleAggProb = cell(totalDays, 1);
 oldAggProb       = cell(totalDays, 1);
 % Old method - did not normalize all rows to 1
 % for d = 1:totalDays
@@ -303,14 +343,24 @@ for d = 1:totalDays
     youngAggDiscrete{d} = A;
 
     % --- Old aggregate ---
-    OM = nan(numStrategies, numStrategies, nOld);
+    MM = nan(numStrategies, numStrategies, nOld);
     for i = 1:nOld
-        OM(:,:,i) = oldDailyDiscreteTrans{i, d};
+        MM(:,:,i) = oldDailyDiscreteTrans{i, d};
     end
-    B = nanmean(OM, 3);
+    B = nanmean(MM, 3);
     rowSums = sum(B, 2);
     B = bsxfun(@rdivide, B, rowSums + eps);
     oldAggDiscrete{d} = B;
+
+        % --- Mddle aggregate ---
+    MM = nan(numStrategies, numStrategies, nMiddle);
+    for i = 1:nMiddle
+        MM(:,:,i) = middleDailyDiscreteTrans{i, d};
+    end
+    C = nanmean(MM, 3);
+    rowSums = sum(C, 2);
+    C = bsxfun(@rdivide, C, rowSums + eps);
+    middleAggDiscrete{d} = C;
 end
 %% KL Divergence calculation
 % Compute KL on discrete transitions ——— %%
@@ -363,7 +413,7 @@ postHocKL_D = runTukeyPostHocMixed(TklD, varNames);
 
 
 %% Shannon Entropy
-uniqueDays = sort( unique(data1.Day) );
+uniqueDays = sort( unique(data1.x_Day) );
 nDays      = numel(uniqueDays);
 nYoung     = numel(youngRatIDs);
 nOld       = numel(oldRatIDs);
@@ -640,7 +690,7 @@ title('Stationary Distribtuion of Discrete Transition Matrices');
 
 %% Entropy on Probability Transition  Matrix
 % Get your actual days
-uniqueDays = sort(unique(data1.Day));
+uniqueDays = sort(unique(data1.x_Day));
 nDays      = numel(uniqueDays);
 
 % Compute means ± SEM
@@ -726,10 +776,11 @@ middleCMap = [linspace(1, middleColor(1), nShades)', ...
 oldCMap = [linspace(1, oldColor(1), nShades)', ...
            linspace(1, oldColor(2), nShades)', ...
            linspace(1, oldColor(3), nShades)'];
+
 f1=figure('Position',[-2505,-898,2063,1103]);
 for d = 1:totalDays
     % --- Young Group Heatmap ---
-    subplot(2, totalDays, d);
+    subplot(3, totalDays, d);
     h1 = heatmap(strategy_titles, strategy_titles, youngAggDiscrete{d});
     h1.Title = ['Day ' num2str(d)];
     h1.XLabel = '\bfNext Strategy';
@@ -745,11 +796,10 @@ for d = 1:totalDays
         h1.YLabel = '';
     end
 
-    % Only show colorbar for last day
     h1.ColorbarVisible = (d == totalDays);
 
     % --- Old Group Heatmap ---
-    subplot(2, totalDays, d + totalDays);
+    subplot(3, totalDays, d + 2*totalDays);
     h2 = heatmap(strategy_titles, strategy_titles, oldAggDiscrete{d});
     h2.Title = [' Day ' num2str(d)];
     h2.XLabel = '\bfNext Strategy';
@@ -767,6 +817,26 @@ for d = 1:totalDays
     end
 
     h2.ColorbarVisible = (d == totalDays);
+
+    % --- Middle Group Heatmap ---
+    subplot(3, totalDays, d + totalDays);
+    h3 = heatmap(strategy_titles, strategy_titles, middleAggDiscrete{d});
+    h3.Title = [' Day ' num2str(d)];
+    h3.XLabel = '\bfNext Strategy';
+    h3.FontSize = 14;
+    h3.ColorLimits = [0 0.5];
+    h3.GridVisible = 'on';
+    
+    h3.CellLabelColor = 'black';
+    h3.Colormap = middleCMap;
+
+    if d == 1
+        h3.YLabel = '\bfCurrent Strategy';
+    else
+        h3.YLabel = '';
+    end
+
+    h3.ColorbarVisible = (d == totalDays);
 end
 
 sgtitle('Strategy Transition Probabilities', 'FontSize', 18, 'FontWeight', 'bold');
@@ -775,14 +845,25 @@ close;
  % Probabilistic transitions heat map
 f2=figure('Position', [100, 100, 2200, 1200]);
 for d = 1:totalDays
-
-    subplot(2, totalDays, d);
+    
+    % young 
+    subplot(3, totalDays, d);
     h1 = heatmap(strategy_titles, strategy_titles, youngAggProb{d});
     h1.Title = ['Young: Day' num2str(d)];
     h1.XLabel = 'Next Trial';
     h1.YLabel = 'Current Trial';
     clim([0 0.4])
-    subplot(2, totalDays, d+totalDays);
+
+    % middle
+    subplot(3, totalDays, d + totalDays);
+    h3 = heatmap(strategy_titles, strategy_titles, middleAggData{d});
+    h3.Title = ['Middle: Day ' num2str(d)];
+    h3.XLabel = 'Next Trial';
+    h1.YLabel = 'Curret Trial';
+    clim([0 0.4])
+
+    % old
+    subplot(2, totalDays, d+2*totalDays);
     h2 = heatmap(strategy_titles, strategy_titles, oldAggProb{d});
     h2.Title = ['Old: Day' num2str(d)];
     h2.XLabel = 'Next Trial';
@@ -797,7 +878,7 @@ close;
 f1=figure('Position',[-2505,-898,2063,1103]);
 for d = 1:totalDays
     % --- Young Group Heatmap ---
-    subplot(2, totalDays, d);
+    subplot(3, totalDays, d);
     h1 = heatmap(strategy_titles, strategy_titles, youngAggProb{d});
     h1.Title = ['Day ' num2str(d)];
     h1.XLabel = '\bfNext Strategy';
@@ -816,8 +897,29 @@ for d = 1:totalDays
     % Only show colorbar for last day
     h1.ColorbarVisible = (d == totalDays);
 
+    % --- Middle Group Heatmap ---
+    subplot(3, totalDays, d + totalDays);
+    h3 = heatmap(strategy_titles, strategy_titles, middleAggProb{d});
+    h3.Title = [' Day ' num2str(d)];
+    h3.XLabel = '\bfNext Strategy';
+    h3.FontSize = 14;
+    h3.ColorLimits = [0 0.5];
+    h3.GridVisible = 'on';
+    
+    h3.CellLabelColor = 'black';
+    h3.Colormap = middleCMap;
+
+    if d == 1
+        h3.YLabel = '\bfCurrent Strategy';
+    else
+        h3.YLabel = '';
+    end
+
+    h3.ColorbarVisible = (d == totalDays);
+
+
     % --- Old Group Heatmap ---
-    subplot(2, totalDays, d + totalDays);
+    subplot(3, totalDays, d + 2*totalDays);
     h2 = heatmap(strategy_titles, strategy_titles, oldAggProb{d});
     h2.Title = [' Day ' num2str(d)];
     h2.XLabel = '\bfNext Strategy';
@@ -863,7 +965,7 @@ close;
 
 %% Plotting: Transitions Matrix - Network Graph
 % Get unique days from the data
-uniqueDays = unique(data1.Day);
+uniqueDays = unique(data1.x_Day);
 nDays = length(uniqueDays);
 
 figure('Position', [100, 100, 1400, 200*nDays]);
@@ -872,7 +974,7 @@ for d = 1:nDays
     day = uniqueDays(d);
     
     % --- Young rats for day 'day' ---
-    dayYoungData = youngData(youngData.Day == day, :);
+    dayYoungData = youngData(youngData.x_Day == day, :);
     youngDayTrans = zeros(numStrategies, numStrategies);
     for i = 1:length(youngRatIDs)
         ratData = dayYoungData(strcmp(dayYoungData.x_TargetID, youngRatIDs{i}), :);
@@ -891,7 +993,7 @@ for d = 1:nDays
     end
     
     % --- Old rats for day 'day' ---
-    dayOldData = oldData(oldData.Day == day, :);
+    dayOldData = oldData(oldData.x_Day == day, :);
     oldDayTrans = zeros(numStrategies, numStrategies);
     for i = 1:length(oldRatIDs)
         ratData = dayOldData(strcmp(dayOldData.x_TargetID, oldRatIDs{i}), :);

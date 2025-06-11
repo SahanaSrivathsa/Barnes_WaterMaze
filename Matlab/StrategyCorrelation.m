@@ -1,5 +1,5 @@
 %% ------------- MUST RUN SECTION FOR ALL FURTHER ANALYSIS ------------- %%
-base_dir='C:\DATA\WaterMaze\Mia_Proj';
+base_dir='/Users/miasponseller/Desktop/Lab/Rtrack/CAS';
 processed_dir=fullfile(base_dir,'StrategyProcessed2');
 fig_dir=fullfile(base_dir,'Figures');
 % Make the dirs if they do not exist
@@ -11,16 +11,17 @@ if ~exist(fig_dir,"dir")
 end
 
 %Load data from Excel files
-data1 = readtable(fullfile(base_dir,'MWM_results_04-04-2025.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
-data2 = readtable(fullfile(base_dir,'AllMorrisWaterMazeData_Spatial.csv'));  % From Matlab Analysis contains Test_No, Cohort, Platform_CIPL
+data1 = readtable(fullfile(base_dir,'CAS_MWM_results_05-28-2025.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
+data2 = readtable(fullfile(base_dir,'CAS_AllRats_Spatial.csv'));  % From Matlab Analysis contains Test_No, Cohort, Platform_CIPL
 % Analysis Parameters that are constant - mostly colours for groups
-grpList = ["Young","Old"];
-clrMap  = {[0.2196,0.5569,0.2353],[0.4157,0.1059,0.6039]}; % green, purple
-% oldColor=[0.4157,0.1059,0.6039];
-% youngColor=[0.2196,0.5569,0.2353];
+grpList = ["Young","Old"]; 
+clrMap  = {[0.2196,0.5569,0.2353],[.1216, .4667, .7059], [0.4157,0.1059,0.6039]}; % green, blue, purple
+oldColor=[0.4157,0.1059,0.6039];
+youngColor=[0.2196,0.5569,0.2353];
+middleColor = [.1216, .4667, .7059];
 % Define the strategy column names (adjust names if needed)
 strategyNames = {'thigmotaxis','circling','random_path','scanning',...
-    'chaining','directed_search','corrected_search','direct_path','perseverance'};
+    'chaining','directed_search','corrected_path','direct_path','perseverance'};
 nStrategies = numel(strategyNames);
 
 strategy_titles={'Thigmotaxis','Circling','Random Path','Scanning',...
@@ -54,16 +55,16 @@ else
 end
 
 %--- For data2: Remove Animals with any NaN in Platform_CIPL ---
-grp_nan = varfun(@(x) any(isnan(x)), data2, 'GroupingVariables', 'Animal', 'InputVariables', 'Platform_CIPL');
-animals_with_nan = grp_nan.Animal(grp_nan.Fun_Platform_CIPL);
-
-if ~isempty(animals_with_nan)
-    fprintf('Removing the following Animals from data2 (NaN in Platform_CIPL):\n');
-    disp(animals_with_nan);
-    data2 = data2(~ismember(data2.Animal, animals_with_nan), :);
-else
-    fprintf('No Animals with NaN in Platform_CIPL in data2.\n');
-end
+% grp_nan = varfun(@(x) any(isnan(x)), data2, 'GroupingVariables', 'Animal', 'InputVariables', 'Platform_CIPL');
+% animals_with_nan = grp_nan.Animal(grp_nan.Fun_Platform_CIPL);
+% 
+% if ~isempty(animals_with_nan)
+%     fprintf('Removing the following Animals from data2 (NaN in Platform_CIPL):\n');
+%     disp(animals_with_nan);
+%     data2 = data2(~ismember(data2.Animal, animals_with_nan), :);
+% else
+%     fprintf('No Animals with NaN in Platform_CIPL in data2.\n');
+% end
 
 %--- Synchronize data1 and data2: Keep only animals that exist in both datasets ---
 commonAnimals = intersect(unique(data1.x_TargetID), unique(string(data2.Animal)));
@@ -71,40 +72,40 @@ commonAnimals = intersect(unique(data1.x_TargetID), unique(string(data2.Animal))
 data1 = data1(ismember(data1.x_TargetID, commonAnimals), :);
 data2 = data2(ismember(string(data2.Animal), commonAnimals), :);
 
-% Get Platform Scores for CIPL - make sure the trial numbers align
-platformScores = zeros(height(data2),1);
+% % Get Platform Scores for CIPL - make sure the trial numbers align
+% platformScores = zeros(height(data2),1);
+% 
+% % Loop over each row in Strategy Data to find corresponding CIPL from
+% % second data set
+% for i = 1:height(data1)
+%     %Get Track ID which has cohort number and trial no.
+%     tID = data1.Track_ID{i};
+%     % Use regexp to extract numeric parts: cohort and test number
+%     tokens = regexp(tID, 'Coh(\d+)_test(\d+)', 'tokens');
+%     if ~isempty(tokens)
+%         token = tokens{1};
+%         cohortNum = str2double(token{1});
+%         testNum = str2double(token{2});
+%         % Find the matching row in data2 using cohort and test numbers
+%         idx = find(data2.Cohort == cohortNum & data2.Test == testNum, 1);
+%         idx2=find(data2.Animal==str2double(data1.x_TargetID{i}) &...
+%             data2.Trial == data1.x_Trial(i));
+%         if(idx~=idx2)
+%             platformScores(i)=NaN;
+%         elseif ~isempty(idx)
+%             platformScores(i) = data2.Platform_CIPL(idx);
+%         else
+%             platformScores(i)=NaN;
+%         end
+%     end
+% end
+% % Remove all the values where platform scores are nan
+% % Identify valid rows (non-NaN platform scores)
+% validIdx = ~isnan(platformScores);
 
-% Loop over each row in Strategy Data to find corresponding CIPL from
-% second data set
-for i = 1:height(data1)
-    %Get Track ID which has cohort number and trial no.
-    tID = data1.Track_ID{i};
-    % Use regexp to extract numeric parts: cohort and test number
-    tokens = regexp(tID, 'Coh(\d+)_test(\d+)', 'tokens');
-    if ~isempty(tokens)
-        token = tokens{1};
-        cohortNum = str2double(token{1});
-        testNum = str2double(token{2});
-        % Find the matching row in data2 using cohort and test numbers
-        idx = find(data2.Cohort == cohortNum & data2.Test == testNum, 1);
-        idx2=find(data2.Animal==str2double(data1.x_TargetID{i}) &...
-            data2.Trial == data1.x_Trial(i));
-        if(idx~=idx2)
-            platformScores(i)=NaN;
-        elseif ~isempty(idx)
-            platformScores(i) = data2.Platform_CIPL(idx);
-        else
-            platformScores(i)=NaN;
-        end
-    end
-end
-% Remove all the values where platform scores are nan
-% Identify valid rows (non-NaN platform scores)
-validIdx = ~isnan(platformScores);
-
-% Filter data1 accordingly
-data1 = data1(validIdx, :);
-platformScores = platformScores(validIdx);  % also update platformScores to match
+% % Filter data1 accordingly
+% data1 = data1(validIdx, :);
+% platformScores = platformScores(validIdx);  % also update platformScores to match
 
 % Get corresponding animal-trial combinations from filtered data1
 validAnimals = str2double(data1.x_TargetID);
@@ -1640,7 +1641,7 @@ nGroups     = numel(groupLabels);
 uniqueDays  = unique(data1.Day);
 
 % Colors for the three groups
-stratColors = [
+stratColors = 
 
 0.3961    0.2627    0.1294;   % Non‑Goal  brown
 1.0000    0.7020    0.4000;   % Procedural yellow ochre
