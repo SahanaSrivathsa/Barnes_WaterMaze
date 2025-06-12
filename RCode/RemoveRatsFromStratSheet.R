@@ -1,6 +1,3 @@
-# If warnings appear after running StratExport.R where no valid path data can be 
-# extracted from a file, run this to remove all trials for that rat
-
 library(readxl)
 library(writexl)
 library(dplyr)

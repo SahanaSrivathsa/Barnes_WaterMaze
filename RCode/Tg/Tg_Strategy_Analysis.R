@@ -12,8 +12,8 @@ all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllR
 fig_folder = '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Figures'
 dir.create(fig_folder, recursive = TRUE, showWarnings = FALSE)
 
-sex_counts <- all_rats_spatial %>% 
-  distinct(Animal, .keep_all = TRUE) %>% 
+sex_counts <- strat_sheet %>% 
+  distinct(`_TargetID`, .keep_all = TRUE) %>% 
   count(Sex)
 #print(sex_counts)
 
@@ -72,7 +72,7 @@ strat_cat_colors <- c(
 )
 
 
-# Dominant Strat Across Days M/F ------------------------------------------
+# Dominant Strat Type Across Days M/F ------------------------------------------
 
 # List of unique sexes
 sexes <- unique(strat_sheet_1$Sex)
@@ -124,6 +124,77 @@ for (s in sexes) {
   # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
   # file_path <- file.path(fig_folder, paste0("Dominant_Strat_Cat_Days_Sex", safe_g, ".jpeg"))
   # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
+}
+
+
+
+# Prob Strat Cat Age/Perf -------------------------------------------------
+
+# Average strategy category by rat, day, and group
+rat_day_avg <- strat_sheet_1 %>% 
+  group_by(Sex, `_TargetID`, `_Day`) %>% 
+  summarize(
+    Allocentric = mean(AllocentricProb, na.rm = TRUE),
+    Procedural = mean(ProceduralProb, na.rm = TRUE),
+    NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Pivot long
+rat_day_long <- rat_day_avg %>% 
+  pivot_longer(cols = c(Allocentric, Procedural, NonGoalOriented),
+               names_to = 'StrategyCategory',
+               values_to = 'Probability')
+
+group_day_summary <- rat_day_long %>% 
+  group_by(Sex, `_Day`, StrategyCategory) %>% 
+  summarize(MeanProb = mean(Probability, na.rm = TRUE),
+            SD = sd(Probability, na.rm = TRUE),
+            SEM = SD/sqrt(n()),
+            .groups = 'drop')
+
+for (s in unique(group_day_summary$Sex)) {
+  
+  # Filter group
+  summary_data <- group_day_summary %>% filter(Sex == s)
+  rat_data <- rat_day_long %>% filter(Sex == s)
+  
+  plt <- ggplot(summary_data, aes(x = as.factor(`_Day`), y = MeanProb, fill = StrategyCategory)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = .8, alpha = .5) +
+    geom_jitter(data = rat_data,
+                aes(x = as.factor(`_Day`), y = Probability, color = StrategyCategory),
+                position = position_jitterdodge(jitter.width = .2, dodge.width = .9),
+                alpha = .8, size = 2, inherit.aes = FALSE) +
+    geom_errorbar(aes(ymin = MeanProb - SEM, ymax = MeanProb + SEM),
+                  width = .2, position = position_dodge(width = .9)) +
+    labs(
+      title = paste("Strategy Use:", s),
+      x = "Day",
+      y = "Probability of Strategy Use",
+      fill = "Strategy Category",
+      color = 'Strategy Category'
+    ) +
+    scale_fill_manual(values = strat_cat_colors) +
+    scale_color_manual(values = strat_cat_colors) +
+    coord_cartesian(ylim = c(0,1)) +
+    theme_minimal(base_size = 14)
+  
+  # Print the plot
+  print(plt)
+  
+  # Save plot to Figures folder
+  # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
+  # file_path <- file.path(fig_folder, paste0("AvgStratCatUse_DayxPerfGroup", safe_g, ".jpeg"))
+  # ggsave(file_path, p, width = 8, height = 6, dpi = 300)
   
 }
+
+
+
+
+
+
+
+
+
 
