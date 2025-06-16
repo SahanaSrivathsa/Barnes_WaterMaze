@@ -33,10 +33,6 @@ list_of_strats = c('direct path', 'corrected path', 'directed search', 'chaining
                    'scanning', 'random path', 'circling', 'thigmotaxis')
 list_of_strat_cats = c('Allocentric', 'Procedural', 'NonGoalOriented')
 
-# Add Age/Performance column
-strat_sheet_1 <- strat_sheet %>% 
-  mutate(Group = paste0(Age, '/', Performance))
-
 # Add Age/Performance and StratCat columns
 strat_sheet_1 <- strat_sheet %>% 
   mutate(Group = paste0(Age, "/", Performance)) %>% 

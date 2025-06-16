@@ -3,7 +3,7 @@ library(dplyr)
 library(writexl)
 
 # Load CSV file (From AllRatsCSV.R)
-input_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_test.csv'
+input_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv'
 output_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx'
 
 
@@ -38,7 +38,7 @@ filtered_df <- df %>% filter(`_TargetID` %in% valid_animals)
 # Select output columns
 output_columns <- c(
   '_TrackID', '_TargetID', '_Trial', '_Day', '_TrackFileFormat', 'Sex', 'Cohort', 
-  '_Arena', '_TrackFile', 'APP', 'CIPL'
+  '_Arena', '_TrackFile', 'APP', 'CIPL', 'Age'
 )
 
 output_df <- filtered_df %>% select(all_of(output_columns))

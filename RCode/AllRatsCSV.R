@@ -5,8 +5,8 @@ library(purrr)
 library(writexl)
 
 # Folder with all ANY-Maze spreadsheets, which should include Key and Spatial sheets.
-# Key columns: BarnesID or CowenID
-# not necessary, but can include for Key: Age, Sex, treatment type
+# Key columns: BarnesID or CowenID, Age
+# not necessary, but can include for Key: Sex, treatment type
 # Spatial columns: Test, Animal, Trial
 # not necessary, but can include for Spatial: Duration, Distance, Mean speed, Path efficiency, CIPL
 spatial_sheets_folder <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Spatial Sheets'
@@ -42,7 +42,7 @@ for (file_path in spatial_files) {
   tryCatch({
     key_df <- read_excel(file_path, sheet = 'Key')
     spatial_df <- read_excel(file_path, sheet = 'Spatial') %>%
-      select(any_of(c('Test', 'Animal', 'Trial', 'CIPL'))) %>%
+      select(any_of(c('Test', 'Animal', 'Trial', 'CIPL', 'Age'))) %>%
       mutate(Animal = as.character(Animal))
     
     id_cols <- intersect(c('BarnesID', 'CowenID'), colnames(key_df))
@@ -50,7 +50,7 @@ for (file_path in spatial_files) {
       stop(paste('No valid ID columns (BarnesID or CowenID) found in', file_name))
     }
     
-    key_df <- key_df %>% select(all_of(c(id_cols, 'Sex', 'APP')))
+    key_df <- key_df %>% select(all_of(c(id_cols, 'Sex', 'APP', 'Age')))
     
     
     # Pivot to long format

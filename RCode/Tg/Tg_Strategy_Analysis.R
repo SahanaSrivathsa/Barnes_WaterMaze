@@ -3,10 +3,15 @@ library(dplyr)
 library(ggplot2)
 library(readxl)
 library(scales)
+library(Rtrack)
 
 # Load data
-strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/rats_removed_Tg_MWM_results_06-11-2025.xlsx')
-all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_test.csv')
+strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_06-16-2025.xlsx')
+all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv')
+description_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx'
+
+# Add if running Rtrack plots
+all_trials <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks'
 
 # Figures Folder
 fig_folder = '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Figures'
@@ -20,9 +25,6 @@ sex_counts <- strat_sheet %>%
 n_male = sex_counts$n[sex_counts$Sex == 'M']
 n_female = sex_counts$n[sex_counts$Sex == 'F']
 
-# Sex groups
-sex_groups <- c('male', 'female')
-
 # Strategy categories
 non_goal_oriented <- c('thigmotaxis', 'circling', 'random path')
 procedural <- c('scanning', 'chaining')
@@ -33,8 +35,13 @@ list_of_strats = c('direct path', 'corrected path', 'directed search', 'chaining
 
 list_of_strat_cats = c('Allocentric', 'Procedural', 'NonGoalOriented')
 
-# Add StratCat column
+# Add StratCat and AgeCat columns
 strat_sheet_1 <- strat_sheet %>% 
+  mutate(AgeCat = case_when(
+    Age <= 13 ~ 'Young',
+    Age >13 & Age <= 17 ~ 'Middle',
+    Age > 17 ~ 'Old'
+  )) %>% 
   mutate(
     StratCat = case_when(
       name %in% non_goal_oriented ~ 'NonGoalOriented',
@@ -42,6 +49,10 @@ strat_sheet_1 <- strat_sheet %>%
       name %in% allocentric ~ 'Allocentric'
     )
   )
+
+# Add Group column
+strat_sheet_1 <- strat_sheet_1 %>% 
+  mutate(Group = paste0(Sex, '-', AgeCat, '-', APP))
 
 # StratCat levels
 strat_sheet_1$StratCat <- factor(
@@ -72,124 +83,96 @@ strat_cat_colors <- c(
 )
 
 
-# Dominant Strat Type Across Days M/F ------------------------------------------
+# Counts ------------------------------------------------------------------
 
-# List of unique sexes
-sexes <- unique(strat_sheet_1$Sex)
+sex_counts <- strat_sheet_1 %>% 
+  filter(Sex %in% c('M', 'F')) %>% 
+  group_by(Sex) %>% 
+  summarize(UniqueCount = n_distinct(`_TargetID`))
+print(sex_counts)
 
-for (s in sexes) {
+group_counts <- strat_sheet_1 %>% 
+  group_by(Group) %>% 
+  summarize(n_animals = n_distinct(`_TargetID`), .groups = 'drop')
+print(group_counts)
+
+# Rtrack Strategy Plots ---------------------------------------------------
+
+bulk_strategy_calling <- function() {
+  experiment_file <- description_file
   
-  sex_data <- strat_sheet_1 %>% 
-    filter(Sex == s)
+  experiment <<- Rtrack::read_experiment(experiment_file, data.dir = all_trials)
+  strategies <<- Rtrack::call_strategy(experiment)
+  list(experiment = experiment, strategies = strategies)
+}
+
+strategy_plots <- function() {
+  # if bulk_strategy_calling() has not alrady been run, run it
+  if (!exists("experiment", envir = .GlobalEnv) || !exists("strategies", envir = .GlobalEnv)) {
+    bulk_strategy_calling()
+  }
   
-  # Mean and SE
-  summary_df <- sex_data %>% 
-    group_by(`_Day`, StratCat) %>% 
-    summarize(
-      mean_prob = mean(confidence, na.rm = TRUE),
-      se = sd(confidence, na.rm = TRUE)/sqrt(n()),
-      .groups = 'drop'
-    )
+  par(cex.lab = 1.4,   # Adjust axis label size
+      cex.axis = 1.3,  # Adjust tick mark labels
+      cex.main = 1.6,  # Main title size
+      cex.sub = 1.2)   # Subtitle size
   
-  plt <- ggplot(summary_df, aes(x = factor(`_Day`), y = mean_prob, fill = StratCat)) +
-    geom_bar(stat = 'identity', position = position_dodge(width = .9), alpha = .5) +
-    geom_jitter(data = sex_data,
-                aes(x = factor(`_Day`), y = confidence, color = StratCat),
-                position = position_jitterdodge(jitter.width = .2, dodge.width = .9),
-                size = 2, alpha = .7,
-                inherit.aes = FALSE,
-                show.legend = FALSE) +
-    geom_errorbar(aes(ymin = mean_prob - se, ymax = mean_prob + se), 
-                  position = position_dodge(width = .9),
-                  width = .2) +
+  # Strategy plot, across all rats
+  Rtrack::plot_strategies(strategies, experiment = experiment)
+  
+  # Strategy plots, by Cohort
+  #Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Cohort")
+  
+  # Strategy plots, by Age
+  Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Sex")
+  
+  print("Plots successfully created")
+}
+
+#strategy_plots()
+
+
+# Strategy Use Proportions by Rat -----------------------------------------
+
+# List of unique groups
+groups <- unique(strat_sheet_1$Group)
+
+# Loop through groups and generate plots for each
+for (g in groups) {
+  group_data <- strat_sheet_1 %>% 
+    filter(Group == g) %>% 
+    group_by(`_Day`, name) %>% 
+    summarize(count = n(), .groups = 'drop') %>% 
+    group_by(`_Day`) %>% 
+    mutate(prop = count/sum(count)) %>% 
+    ungroup()
+  
+  plt <- ggplot(group_data, aes(x = factor(`_Day`), y = prop, 
+                                fill = factor(name, levels = list_of_strats))) +
+    geom_bar(stat = 'identity', position = 'stack') +
+    scale_fill_manual(values = strat_colors) + 
+    scale_y_continuous() +
     labs(
-      title = paste('Strategy Category Usage by Day -', tools::toTitleCase(s)),
-      x = 'Day', y = 'Probability of Strategy Category',
-      fill = 'Category'
-    ) +
-    scale_fill_manual(values = strat_cat_colors) +
-    scale_color_manual(values = strat_cat_colors) +
-    scale_y_continuous(limits = c(0, 1)) +
+      title = paste('Dominant Strategy Usage by Day:', g),
+      x = 'Day', y = 'Proportion of Trials',
+      fill = 'Strategy'
+    ) + 
     theme_minimal(base_size = 14) +
     theme(
       axis.title = element_text(size = 16, face = 'bold'),
       axis.text = element_text(size = 14, face = 'bold'),
       plot.title = element_text(size = 18, face = 'bold', hjust = .5),
       legend.title = element_text(size = 14),
-      legend.text = element_text(size = 12))
-  
-  print(plt)
+      legend.text = element_text(size = 12)
+    )
   
   # Save plot to Figures folder
   # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
-  # file_path <- file.path(fig_folder, paste0("Dominant_Strat_Cat_Days_Sex", safe_g, ".jpeg"))
+  # file_path <- file.path(fig_folder, paste0("Dominant_Strategy_Rats_Days_", safe_g, ".jpeg"))
   # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
-}
-
-
-
-# Prob Strat Cat Age/Perf -------------------------------------------------
-
-# Average strategy category by rat, day, and group
-rat_day_avg <- strat_sheet_1 %>% 
-  group_by(Sex, `_TargetID`, `_Day`) %>% 
-  summarize(
-    Allocentric = mean(AllocentricProb, na.rm = TRUE),
-    Procedural = mean(ProceduralProb, na.rm = TRUE),
-    NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
-    .groups = 'drop'
-  )
-
-# Pivot long
-rat_day_long <- rat_day_avg %>% 
-  pivot_longer(cols = c(Allocentric, Procedural, NonGoalOriented),
-               names_to = 'StrategyCategory',
-               values_to = 'Probability')
-
-group_day_summary <- rat_day_long %>% 
-  group_by(Sex, `_Day`, StrategyCategory) %>% 
-  summarize(MeanProb = mean(Probability, na.rm = TRUE),
-            SD = sd(Probability, na.rm = TRUE),
-            SEM = SD/sqrt(n()),
-            .groups = 'drop')
-
-for (s in unique(group_day_summary$Sex)) {
   
-  # Filter group
-  summary_data <- group_day_summary %>% filter(Sex == s)
-  rat_data <- rat_day_long %>% filter(Sex == s)
-  
-  plt <- ggplot(summary_data, aes(x = as.factor(`_Day`), y = MeanProb, fill = StrategyCategory)) +
-    geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = .8, alpha = .5) +
-    geom_jitter(data = rat_data,
-                aes(x = as.factor(`_Day`), y = Probability, color = StrategyCategory),
-                position = position_jitterdodge(jitter.width = .2, dodge.width = .9),
-                alpha = .8, size = 2, inherit.aes = FALSE) +
-    geom_errorbar(aes(ymin = MeanProb - SEM, ymax = MeanProb + SEM),
-                  width = .2, position = position_dodge(width = .9)) +
-    labs(
-      title = paste("Strategy Use:", s),
-      x = "Day",
-      y = "Probability of Strategy Use",
-      fill = "Strategy Category",
-      color = 'Strategy Category'
-    ) +
-    scale_fill_manual(values = strat_cat_colors) +
-    scale_color_manual(values = strat_cat_colors) +
-    coord_cartesian(ylim = c(0,1)) +
-    theme_minimal(base_size = 14)
-  
-  # Print the plot
   print(plt)
-  
-  # Save plot to Figures folder
-  # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
-  # file_path <- file.path(fig_folder, paste0("AvgStratCatUse_DayxPerfGroup", safe_g, ".jpeg"))
-  # ggsave(file_path, p, width = 8, height = 6, dpi = 300)
-  
 }
-
-
 
 
 
