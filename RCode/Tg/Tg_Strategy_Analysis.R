@@ -4,6 +4,9 @@ library(ggplot2)
 library(readxl)
 library(scales)
 library(Rtrack)
+library(afex)
+library(emmeans)
+
 
 # Load data
 strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_06-16-2025.xlsx')
@@ -13,14 +16,13 @@ description_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx
 # Add if running Rtrack plots
 all_trials <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks'
 
+# Fix floating-point precision issue
+strat_sheet$Age <- as.numeric(strat_sheet$Age)
+strat_sheet$Age <- round(strat_sheet$Age, 1)
+
 # Figures Folder
 fig_folder = '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Figures'
 dir.create(fig_folder, recursive = TRUE, showWarnings = FALSE)
-
-sex_counts <- strat_sheet %>% 
-  distinct(`_TargetID`, .keep_all = TRUE) %>% 
-  count(Sex)
-#print(sex_counts)
 
 n_male = sex_counts$n[sex_counts$Sex == 'M']
 n_female = sex_counts$n[sex_counts$Sex == 'F']
@@ -38,8 +40,8 @@ list_of_strat_cats = c('Allocentric', 'Procedural', 'NonGoalOriented')
 # Add StratCat and AgeCat columns
 strat_sheet_1 <- strat_sheet %>% 
   mutate(AgeCat = case_when(
-    Age <= 13 ~ 'Young',
-    Age >13 & Age <= 17 ~ 'Middle',
+    Age <= 9 ~ 'Young',
+    Age > 9 & Age <= 17 ~ 'Middle',
     Age > 17 ~ 'Old'
   )) %>% 
   mutate(
@@ -90,6 +92,12 @@ sex_counts <- strat_sheet_1 %>%
   group_by(Sex) %>% 
   summarize(UniqueCount = n_distinct(`_TargetID`))
 print(sex_counts)
+
+age_counts <- strat_sheet_1 %>% 
+  filter(AgeCat %in% c('Young', 'Middle', 'Old')) %>% 
+  group_by(AgeCat) %>% 
+  summarize(UniqueCount = n_distinct(`_TargetID`))
+print(age_counts)
 
 group_counts <- strat_sheet_1 %>% 
   group_by(Group) %>% 
@@ -168,11 +176,109 @@ for (g in groups) {
   
   # Save plot to Figures folder
   # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
-  # file_path <- file.path(fig_folder, paste0("Dominant_Strategy_Rats_Days_", safe_g, ".jpeg"))
+  # file_path <- file.path(fig_folder, paste0("Dominant_Strategy_PropOfTrials", safe_g, ".jpeg"))
   # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
   
   print(plt)
 }
+
+# Prob Strat Cat Age/Perf -------------------------------------------------
+
+# Average strategy category by rat, day, and group
+rat_day_avg <- strat_sheet_1 %>% 
+  group_by(Group, `_TargetID`, `_Day`) %>% 
+  summarize(
+    Allocentric = mean(AllocentricProb, na.rm = TRUE),
+    Procedural = mean(ProceduralProb, na.rm = TRUE),
+    NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Pivot long
+rat_day_long <- rat_day_avg %>% 
+  pivot_longer(cols = c(Allocentric, Procedural, NonGoalOriented),
+               names_to = 'StrategyCategory',
+               values_to = 'Probability')
+
+group_day_summary <- rat_day_long %>% 
+  group_by(Group, `_Day`, StrategyCategory) %>% 
+  summarize(MeanProb = mean(Probability, na.rm = TRUE),
+            SD = sd(Probability, na.rm = TRUE),
+            SEM = SD/sqrt(n()),
+            .groups = 'drop')
+
+for (g in unique(group_day_summary$Group)) {
+  
+  # Filter group
+  summary_data <- group_day_summary %>% filter(Group == g)
+  rat_data <- rat_day_long %>% filter(Group == g)
+  
+  plt <- ggplot(summary_data, aes(x = as.factor(`_Day`), y = MeanProb, fill = StrategyCategory)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = .8, alpha = .5) +
+    geom_jitter(data = rat_data,
+                aes(x = as.factor(`_Day`), y = Probability, color = StrategyCategory),
+                position = position_jitterdodge(jitter.width = .2, dodge.width = .9),
+                alpha = .8, size = 2, inherit.aes = FALSE) +
+    geom_errorbar(aes(ymin = MeanProb - SEM, ymax = MeanProb + SEM),
+                  width = .2, position = position_dodge(width = .9)) +
+    labs(
+      title = paste("Strategy Use:", g),
+      x = "Day",
+      y = "Probability of Strategy Use",
+      fill = "Strategy Category",
+      color = 'Strategy Category'
+    ) +
+    scale_fill_manual(values = strat_cat_colors) +
+    scale_color_manual(values = strat_cat_colors) +
+    coord_cartesian(ylim = c(0,1)) +
+    theme_minimal(base_size = 14)
+  
+  # Print the plot
+  print(plt)
+  
+  # Save plot to Figures folder
+  # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
+  # file_path <- file.path(fig_folder, paste0("AvgStratCatUse_DayxPerfGroup", safe_g, ".jpeg"))
+  # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
+  
+}
+
+
+# Repeated Measures ANOVA and Post-hoc ------------------------------------
+for (g in unique(rat_day_long$Group)) {
+  cat("Running repeated measures ANOVA for Group:", g, "\n")
+  
+  # Filter and prepare data
+  group_data <- rat_day_long %>%
+    filter(Group == g) %>%
+    mutate(
+      Subject = as.factor(`_TargetID`),
+      `_Day` = as.factor(`_Day`),
+      StrategyCategory = as.factor(StrategyCategory)
+    )
+  
+  # Run repeated measures ANOVA
+  aov_results <- aov_ez(
+    id = "Subject",    
+    dv = "Probability",
+    within = c("_Day", "StrategyCategory"),
+    data = group_data,
+    anova_table = list(correction = "GG", es = "ges")
+  )
+  
+  print(aov_results)
+  
+  # Post-hoc test
+  posthoc <- emmeans(aov_results, ~ StrategyCategory | `_Day`)
+  pairwise <- contrast(posthoc, method = "pairwise", adjust = "bonferroni")
+  print(pairwise)
+  
+  # Post-hoc comparisons across days for each strategy
+  daywise_posthoc <- emmeans(aov_results, ~ `_Day` | StrategyCategory)
+  daywise_contrasts <- contrast(daywise_posthoc, method = "pairwise", adjust = "bonferroni")
+  print(daywise_contrasts)
+}
+
 
 
 

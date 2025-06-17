@@ -54,7 +54,7 @@ for (i in seq_len(nrow(invalid_animals))) {
   trials <- sort(unlist(invalid_animals$trials[i]))
   output[i] <- paste0('Rat ', rat, ' Trials: ', paste(trials, collapse = ', '))
 }
-cat('\nAnimals excluded (missing trials 1-24 or trial labels incorrected):\n')
+cat('\nAnimals excluded (missing trials 1-24 or trial labeled incorrectly):\n')
 cat(paste(output, collapse = '\n'), '\n')
 
 
