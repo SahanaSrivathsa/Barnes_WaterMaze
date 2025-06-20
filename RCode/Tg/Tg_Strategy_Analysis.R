@@ -9,6 +9,7 @@ library(emmeans)
 library(colorspace)
 
 
+# MUST RUN ----------------------------------------------------------------
 # Load data
 strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_06-17-2025.xlsx')
 all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv')
@@ -115,7 +116,6 @@ sex_age_colors <- c(
   "F-20"    = "#bfef45",  # Lime Green (also bright)
   "M-20"    = "#7f7fff"   # Light Magenta (swap if pastel-like)
 )
-
 
 
 # Counts ------------------------------------------------------------------
@@ -369,11 +369,15 @@ for(i in seq_len(nrow(groups_to_plot))) {
   
   print(plt)
   
-  # Optional: save plot
-  safe_title <- gsub("[^A-Za-z0-9_]", "_", plot_title)
-  file_path <- file.path(fig_folder, paste0("AvgStratCatUse_Day_Sex_Genotype_Age", safe_title, ".jpeg"))
-  ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
+  # Save plot to Figures folder
+  # safe_title <- gsub("[^A-Za-z0-9_]", "_", plot_title)
+  # file_path <- file.path(fig_folder, paste0("AvgStratCatUse_Day_Sex_Genotype_Age", safe_title, ".jpeg"))
+  # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
 }
+
+# --- ANOVA ---
+
+
 
 
 
