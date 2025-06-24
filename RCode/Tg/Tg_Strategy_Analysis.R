@@ -7,6 +7,7 @@ library(Rtrack)
 library(afex)
 library(emmeans)
 library(colorspace)
+library(ggpubr)
 
 
 # MUST RUN ----------------------------------------------------------------
@@ -374,10 +375,6 @@ for(i in seq_len(nrow(groups_to_plot))) {
   # file_path <- file.path(fig_folder, paste0("AvgStratCatUse_Day_Sex_Genotype_Age", safe_title, ".jpeg"))
   # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
 }
-
-# --- ANOVA ---
-
-
 
 
 
