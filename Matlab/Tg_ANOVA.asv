@@ -73,7 +73,7 @@ for i = 1:n_rats
     end
 end
 
-%% Create Rat table
+%% Make Rat table
 
 var_names = ["RatID","AgeGroup","Sex","Genotype"];
 for g = 1:n_cats
@@ -115,34 +115,34 @@ for g = 1:n_cats
     disp(results(g).omnibus);
 
     % Tukey‑Kramer post‑hoc for Day within each AgeGroup
-    post_tbl = multcompare(rm, "Day", "By", "AgeGroup", "ComparisonType", "tukey-kramer");
+    postTbl = multcompare(rm, "Day", "By", "AgeGroup", "ComparisonType", "tukey-kramer");
 
     % Bonferroni correction
-    m = height(post_tbl);
-    post_tbl.Bonferroni_pValue = min(post_tbl.pValue * m, 1);
+    m = height(postTbl);
+    postTbl.Bonferroni_pValue = min(postTbl.pValue * m, 1);
 
     % Move AgeGroup to front and sort numerically
-    post_tbl = movevars(post_tbl, 'AgeGroup', 'Before', 1);
-    post_tbl.AgeNum = str2double(string(post_tbl.AgeGroup));
-    post_tbl = sortrows(post_tbl, 'AgeNum');
-    post_tbl.AgeNum = [];
+    postTbl = movevars(postTbl, 'AgeGroup', 'Before', 1);
+    postTbl.AgeNum = str2double(string(postTbl.AgeGroup));
+    postTbl = sortrows(postTbl, 'AgeNum');
+    postTbl.AgeNum = [];
 
     % Display full results
     fprintf('Post‑hoc Day comparisons by AgeGroup (Bonferroni corrected):\n');
-    disp(post_tbl(:, {'AgeGroup','Day_1','Day_2','pValue','Bonferroni_pValue'}));
+    disp(postTbl(:, {'AgeGroup','Day_1','Day_2','pValue','Bonferroni_pValue'}));
 
     % Display only significant comparisons
     alpha = 0.05;
-    sig_tbl = post_tbl(post_tbl.Bonferroni_pValue < alpha, :);
+    sigTbl = postTbl(postTbl.Bonferroni_pValue < alpha, :);
 
     fprintf('\nSignificant comparisons (Bonferroni‑corrected p < %.3f):\n', alpha);
-    if isempty(sig_tbl)
+    if isempty(sigTbl)
         disp('   None');
     else
-        disp(sig_tbl(:, {'AgeGroup','Day_1','Day_2','pValue','Bonferroni_pValue'}));
+        disp(sigTbl(:, {'AgeGroup','Day_1','Day_2','pValue','Bonferroni_pValue'}));
     end
 
     % Store results
-    results(g).posthoc_all  = post_tbl;
-    results(g).posthoc_sig  = sig_tbl;
+    results(g).posthoc_all  = postTbl;
+    results(g).posthoc_sig  = sigTbl;
 end
