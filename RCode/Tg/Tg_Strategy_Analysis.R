@@ -8,9 +8,11 @@ library(afex)
 library(emmeans)
 library(colorspace)
 library(ggpubr)
-
+library(rstatix)
+library(car)
 
 # MUST RUN ----------------------------------------------------------------
+
 # Load data
 strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_06-17-2025.xlsx')
 all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv')
@@ -19,7 +21,7 @@ description_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx
 # Add if running Rtrack plots
 all_trials <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks'
 
-# Fix floating-point precision issue
+# Fix floating-point precision issue for Age column
 # strat_sheet$Age <- as.numeric(strat_sheet$Age)
 # strat_sheet$Age <- round(strat_sheet$Age, 1)
 
@@ -44,7 +46,7 @@ list_of_strats = c('direct path', 'corrected path', 'directed search', 'chaining
 
 list_of_strat_cats = c('Allocentric', 'Procedural', 'NonGoalOriented')
 
-# Add StratCat, AgeCat, and Group columns
+# Add StratCat, AgeCat, AgeGroup, and Group columns
 strat_sheet <- strat_sheet %>% 
   mutate(
     StratCat = case_when(
@@ -61,7 +63,14 @@ strat_sheet <- strat_sheet %>%
       Age %in% c(15, 16) ~ '15.5',
       Age %in% c(20) ~ '20'
     )) %>% 
-  mutate(Group = paste0(Sex, '-', APP))
+  mutate(Group = paste0(Sex, '-', APP)) %>% 
+  mutate(
+    AgeGroup = case_when(
+      Age %in% c(4, 5, 6, 7, 8) ~ 'Young',
+      Age %in% c(9, 10, 11, 12, 13, 14) ~ 'Middle',
+      Age %in% c(15,16, 17, 18, 19, 20, 21, 22) ~ 'Old'
+    )
+  )
 
 # StratCat levels
 strat_sheet$StratCat <- factor(
@@ -106,16 +115,16 @@ strat_cat_colors <- c(
 )
 
 sex_age_colors <- c(
-  "F-5"     = "#e6194b",  # Vivid Red
-  "M-5"     = "#f58231",  # Vivid Orange
-  "F-8"     = "#3cb44b",  # Vivid Green
-  "M-8"     = "#0082c8",  # Vivid Blue
-  "F-11"    = "#911eb4",  # Vivid Purple
-  "M-11"    = "#46f0f0",  # Bright Cyan
-  "F-15.5"  = "#000075",  # Dark Blue (adds contrast)
-  "M-15.5"  = "#f032e6",  # Yellow *included optionally* — change if unwanted
-  "F-20"    = "#bfef45",  # Lime Green (also bright)
-  "M-20"    = "#7f7fff"   # Light Magenta (swap if pastel-like)
+  "F-5"     = "#e6194b",
+  "M-5"     = "#f58231",
+  "F-8"     = "#3cb44b",
+  "M-8"     = "#0082c8",
+  "F-11"    = "#911eb4",
+  "M-11"    = "#46f0f0",
+  "F-15.5"  = "#000075",
+  "M-15.5"  = "#f032e6",
+  "F-20"    = "#bfef45",
+  "M-20"    = "#7f7fff"
 )
 
 
@@ -152,16 +161,15 @@ print(final_summary)
 
 # Rtrack Strategy Plots ---------------------------------------------------
 
-bulk_strategy_calling <- function() {
-  experiment_file <- description_file
+r_track_strat_plots <- function() {
+  bulk_strategy_calling <- function() {
+    experiment_file <- description_file
+    
+    experiment <<- Rtrack::read_experiment(experiment_file, data.dir = all_trials)
+    strategies <<- Rtrack::call_strategy(experiment)
+    list(experiment = experiment, strategies = strategies)
+  }
   
-  experiment <<- Rtrack::read_experiment(experiment_file, data.dir = all_trials)
-  strategies <<- Rtrack::call_strategy(experiment)
-  list(experiment = experiment, strategies = strategies)
-}
-
-strategy_plots <- function() {
-  # if bulk_strategy_calling() has not alrady been run, run it
   if (!exists("experiment", envir = .GlobalEnv) || !exists("strategies", envir = .GlobalEnv)) {
     bulk_strategy_calling()
   }
@@ -182,200 +190,298 @@ strategy_plots <- function() {
   
   print("Plots successfully created")
 }
+bulk_strategy_calling <- function() {
+  experiment_file <- description_file
+  
+  experiment <<- Rtrack::read_experiment(experiment_file, data.dir = all_trials)
+  strategies <<- Rtrack::call_strategy(experiment)
+  list(experiment = experiment, strategies = strategies)
+}
 
-#strategy_plots()
-
+r_track_strat_plots()
 
 # Strategy Use Proportions by Rat -----------------------------------------
 
-# List of unique groups
-groups <- unique(strat_sheet$Group)
-
-# Loop through groups and generate plots for each
-for (g in groups) {
-  group_data <- strat_sheet %>% 
-    filter(Group == g) %>% 
-    group_by(`_Day`, name) %>% 
-    summarize(count = n(), .groups = 'drop') %>% 
-    group_by(`_Day`) %>% 
-    mutate(prop = count/sum(count)) %>% 
-    ungroup()
+strategy_proportions_graphs <- function() {
+  # List of unique groups
+  groups <- unique(strat_sheet$Group)
   
-  plt <- ggplot(group_data, aes(x = factor(`_Day`), y = prop, 
-                                fill = factor(name, levels = list_of_strats))) +
-    geom_bar(stat = 'identity', position = 'stack') +
-    scale_fill_manual(values = strat_colors) + 
-    scale_y_continuous() +
-    labs(
-      title = paste('Dominant Strategy Usage by Day:', g),
-      x = 'Day', y = 'Proportion of Trials',
-      fill = 'Strategy'
-    ) + 
-    theme_minimal(base_size = 14) +
-    theme(
-      axis.title = element_text(size = 16, face = 'bold'),
-      axis.text = element_text(size = 14, face = 'bold'),
-      plot.title = element_text(size = 18, face = 'bold', hjust = .5),
-      legend.title = element_text(size = 14),
-      legend.text = element_text(size = 12)
-    )
-  
-  # Save plot to Figures folder
-  # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
-  # file_path <- file.path(fig_folder, paste0("Dominant_Strategy_PropOfTrials", safe_g, ".jpeg"))
-  # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
-  
-  print(plt)
+  # Loop through groups and generate plots for each
+  for (g in groups) {
+    group_data <- strat_sheet %>% 
+      filter(Group == g) %>% 
+      group_by(`_Day`, name) %>% 
+      summarize(count = n(), .groups = 'drop') %>% 
+      group_by(`_Day`) %>% 
+      mutate(prop = count/sum(count)) %>% 
+      ungroup()
+    
+    plt <- ggplot(group_data, aes(x = factor(`_Day`), y = prop, 
+                                  fill = factor(name, levels = list_of_strats))) +
+      geom_bar(stat = 'identity', position = 'stack') +
+      scale_fill_manual(values = strat_colors) + 
+      scale_y_continuous() +
+      labs(
+        title = paste('Dominant Strategy Usage by Day:', g),
+        x = 'Day', y = 'Proportion of Trials',
+        fill = 'Strategy'
+      ) + 
+      theme_minimal(base_size = 14) +
+      theme(
+        axis.title = element_text(size = 16, face = 'bold'),
+        axis.text = element_text(size = 14, face = 'bold'),
+        plot.title = element_text(size = 18, face = 'bold', hjust = .5),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)
+      )
+    
+    # Save plot to Figures folder
+    # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
+    # file_path <- file.path(fig_folder, paste0("Dominant_Strategy_PropOfTrials", safe_g, ".jpeg"))
+    # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
+    
+    print(plt)
+  }
 }
 
 # Prob Strat Cat Sex/Genotype ---------------------------------------------
 
-# Average strategy category by rat, day, and group
-rat_day_avg <- strat_sheet %>% 
-  group_by(Group, `_TargetID`, `_Day`) %>% 
-  summarize(
-    Allocentric = mean(AllocentricProb, na.rm = TRUE),
-    Procedural = mean(ProceduralProb, na.rm = TRUE),
-    NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
-    .groups = 'drop'
-  )
-
-# Pivot long
-rat_day_long <- rat_day_avg %>% 
-  pivot_longer(cols = c(Allocentric, Procedural, NonGoalOriented),
-               names_to = 'StratCat',
-               values_to = 'Probability') %>% 
-  mutate(StratCat = factor(
-    StratCat,
-    levels = c('NonGoalOriented', 'Procedural', 'Allocentric')
-  ))
-
-group_day_summary <- rat_day_long %>% 
-  group_by(Group, `_Day`, StratCat) %>% 
-  summarize(MeanProb = mean(Probability, na.rm = TRUE),
-            SD = sd(Probability, na.rm = TRUE),
-            SEM = SD/sqrt(n()),
-            .groups = 'drop')
-
-for (g in unique(group_day_summary$Group)) {
+sex_genotype <- function() {
+  # Average strategy category by rat, day, and group
+  rat_day_avg <- strat_sheet %>% 
+    group_by(Group, `_TargetID`, `_Day`) %>% 
+    summarize(
+      Allocentric = mean(AllocentricProb, na.rm = TRUE),
+      Procedural = mean(ProceduralProb, na.rm = TRUE),
+      NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
+      .groups = 'drop'
+    )
   
-  # Filter group
-  summary_data <- group_day_summary %>% filter(Group == g)
-  rat_data <- rat_day_long %>% filter(Group == g)
+  # Pivot long
+  rat_day_long <- rat_day_avg %>% 
+    pivot_longer(cols = c(Allocentric, Procedural, NonGoalOriented),
+                 names_to = 'StratCat',
+                 values_to = 'Probability') %>% 
+    mutate(StratCat = factor(
+      StratCat,
+      levels = c('NonGoalOriented', 'Procedural', 'Allocentric')
+    ))
   
-  plt <- ggplot(summary_data, aes(x = as.factor(`_Day`), y = MeanProb, fill = StratCat)) +
-    geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = .8, alpha = .5) +
-    geom_jitter(data = rat_data,
-                aes(x = as.factor(`_Day`), y = Probability, color = StratCat),
-                position = position_jitterdodge(jitter.width = .2, dodge.width = .9),
-                alpha = .8, size = 2, inherit.aes = FALSE) +
-    geom_errorbar(aes(ymin = MeanProb - SEM, ymax = MeanProb + SEM),
-                  width = .2, position = position_dodge(width = .9)) +
-    labs(
-      title = paste("Strategy Use:", g),
-      x = "Day",
-      y = "Probability of Strategy Use",
-      fill = "Strategy Category",
-      color = 'Strategy Category'
-    ) +
-    scale_fill_manual(values = strat_cat_colors) +
-    scale_color_manual(values = strat_cat_colors) +
-    coord_cartesian(ylim = c(0,1)) +
-    theme_minimal(base_size = 14)
+  group_day_summary <- rat_day_long %>% 
+    group_by(Group, `_Day`, StratCat) %>% 
+    summarize(MeanProb = mean(Probability, na.rm = TRUE),
+              SD = sd(Probability, na.rm = TRUE),
+              SEM = SD/sqrt(n()),
+              .groups = 'drop')
   
-  # Print the plot
-  print(plt)
-  
-  # Save plot to Figures folder
-  safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
-  file_path <- file.path(fig_folder, paste0("AvgStratCatUse_Day_Sex_Genotype_", safe_g, ".jpeg"))
-  ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
-  
+  for (g in unique(group_day_summary$Group)) {
+    
+    # Filter data for group g
+    summary_data <- group_day_summary %>% filter(Group == g)
+    rat_data <- rat_day_long %>% filter(Group == g)
+    
+    # Make _Day a factor with all 4 days explicitly
+    rat_data <- rat_data %>%
+      mutate(
+        DayFactor = factor(`_Day`, levels = c("1", "2", "3", "4"))
+      )
+    
+    # Print counts of observations per StratCat and Day
+    cat("\n=== Counts of observations by StratCat and Day for Group:", g, "===\n")
+    print(
+      rat_data %>% 
+        group_by(StratCat, DayFactor) %>% 
+        tally() %>% 
+        arrange(StratCat, DayFactor)
+    )
+    
+    # Run pairwise t-tests within each strategy category (all pairs possible)
+    pvals_df_all <- rat_data %>%
+      group_by(StratCat) %>%
+      pairwise_t_test(
+        Probability ~ DayFactor,
+        p.adjust.method = "bonferroni"
+      )
+    
+    # Print all day pairs tested
+    cat("\n=== All day pairs being compared for Group:", g, "===\n")
+    pvals_df_all %>%
+      select(StratCat, group1, group2) %>%
+      distinct() %>%
+      arrange(StratCat, group1, group2) %>%
+      print(n = Inf)
+    
+    # Filter significant pairs and add labels
+    pvals_df <- pvals_df_all %>%
+      mutate(
+        p.adj.label = case_when(
+          p.adj < 0.001 ~ "***",
+          p.adj < 0.01  ~ "**",
+          p.adj < 0.05  ~ "*",
+          TRUE ~ NA_character_
+        )
+      ) %>%
+      filter(!is.na(p.adj.label)) %>%
+      mutate(
+        y.position = case_when(
+          StratCat == "NonGoalOriented" ~ 0.8,
+          StratCat == "Procedural" ~ 0.9,
+          StratCat == "Allocentric" ~ 1.0
+        ) + as.numeric(factor(paste(group1, group2, sep = "_"))) * 0.025
+      )
+    
+    # Calculate dodge offsets
+    dodge_width <- 0.9
+    strat_levels <- c('NonGoalOriented', 'Procedural', 'Allocentric')
+    n_strat <- length(strat_levels)
+    bar_width <- dodge_width / n_strat
+    dodge_offsets <- setNames(
+      seq(0, by = bar_width, length.out = n_strat) - dodge_width/2 + bar_width/2,
+      strat_levels
+    )
+    
+    # Ensure group1 and group2 factors have correct levels
+    levels_day <- levels(rat_data$DayFactor)
+    
+    pvals_df <- pvals_df %>%
+      mutate(
+        group1 = factor(group1, levels = levels_day),
+        group2 = factor(group2, levels = levels_day),
+        group1_num = as.numeric(group1),
+        group2_num = as.numeric(group2),
+        xmin = group1_num + dodge_offsets[StratCat],
+        xmax = group2_num + dodge_offsets[StratCat]
+      )
+    
+    # Print significant p-values
+    cat("\n=== Significant pairwise p-values for Group:", g, "===\n")
+    print(pvals_df %>% select(StratCat, group1, group2, p, p.adj, p.adj.label))
+    
+    # Plot
+    plt <- ggplot(summary_data, aes(x = as.factor(`_Day`), y = MeanProb, fill = StratCat)) +
+      geom_bar(stat = "identity", position = position_dodge(width = dodge_width), width = .8, alpha = .5) +
+      geom_jitter(data = rat_data,
+                  aes(x = as.factor(`_Day`), y = Probability, color = StratCat),
+                  position = position_jitterdodge(jitter.width = .2, dodge.width = dodge_width),
+                  alpha = .8, size = 2, inherit.aes = FALSE) +
+      geom_errorbar(aes(ymin = MeanProb - SEM, ymax = MeanProb + SEM),
+                    width = .2, position = position_dodge(width = dodge_width)) +
+      stat_pvalue_manual(
+        pvals_df,
+        label = "p.adj.label",
+        y.position = "y.position",
+        xmin = "xmin",
+        xmax = "xmax",
+        tip.length = 0.01,
+        step.increase = 0.02,
+        bracket.size = 0.3
+      ) +
+      labs(
+        title = paste("Strategy Use:", g),
+        x = "Day",
+        y = "Probability of Strategy Use",
+        fill = "Strategy Category",
+        color = 'Strategy Category'
+      ) +
+      scale_fill_manual(values = strat_cat_colors) +
+      scale_color_manual(values = strat_cat_colors) +
+      coord_cartesian(ylim = c(0, 1.1)) +
+      theme_minimal(base_size = 14)
+    
+    print(plt)
+    
+    # Save plot to Figures folder
+    # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
+    # file_path <- file.path(fig_folder, paste0("AvgStratCatUse_Day_Sex_Genotype_", safe_g, ".jpeg"))
+    # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
+    
+  }
 }
-
 
 # Prob StratCat Sex/Genotype/AgeCat ---------------------------------------
-# Average strategy category by rat, day, sex, genotype, and age category
-rat_day_avg2 <- strat_sheet %>%
-  group_by(Sex, APP, AgeCat, `_TargetID`, `_Day`) %>%
-  summarize(
-    Allocentric = mean(AllocentricProb, na.rm = TRUE),
-    Procedural = mean(ProceduralProb, na.rm = TRUE),
-    NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
-    .groups = 'drop'
-  )
 
-# Pivot long
-rat_day_long2 <- rat_day_avg2 %>%
-  pivot_longer(
-    cols = c(Allocentric, Procedural, NonGoalOriented),
-    names_to = 'StratCat',
-    values_to = 'Probability'
-  ) %>%
-  mutate(StratCat = factor(
-    StratCat,
-    levels = c('NonGoalOriented', 'Procedural', 'Allocentric')
-  ))
-
-# Summary for plotting
-group_day_summary2 <- rat_day_long2 %>%
-  group_by(Sex, APP, AgeCat, `_Day`, StratCat) %>%
-  summarize(
-    MeanProb = mean(Probability, na.rm = TRUE),
-    SD = sd(Probability, na.rm = TRUE),
-    SEM = SD / sqrt(n()),
-    .groups = 'drop'
-  )
-
-groups_to_plot <- unique(group_day_summary2 %>% select(Sex, APP, AgeCat))
-
-for(i in seq_len(nrow(groups_to_plot))) {
-  current_group <- groups_to_plot[i, ]
-  
-  summary_data <- group_day_summary2 %>%
-    filter(
-      Sex == current_group$Sex,
-      APP == current_group$APP,
-      AgeCat == current_group$AgeCat
+sex_genoetype_agecat <- function() {
+  # Average strategy category by rat, day, sex, genotype, and age category
+  rat_day_avg2 <- strat_sheet %>%
+    group_by(Sex, APP, AgeCat, `_TargetID`, `_Day`) %>%
+    summarize(
+      Allocentric = mean(AllocentricProb, na.rm = TRUE),
+      Procedural = mean(ProceduralProb, na.rm = TRUE),
+      NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
+      .groups = 'drop'
     )
   
-  rat_data <- rat_day_long2 %>%
-    filter(
-      Sex == current_group$Sex,
-      APP == current_group$APP,
-      AgeCat == current_group$AgeCat
+  # Pivot long
+  rat_day_long2 <- rat_day_avg2 %>%
+    pivot_longer(
+      cols = c(Allocentric, Procedural, NonGoalOriented),
+      names_to = 'StratCat',
+      values_to = 'Probability'
+    ) %>%
+    mutate(StratCat = factor(
+      StratCat,
+      levels = c('NonGoalOriented', 'Procedural', 'Allocentric')
+    ))
+  
+  # Summary for plotting
+  group_day_summary2 <- rat_day_long2 %>%
+    group_by(Sex, APP, AgeCat, `_Day`, StratCat) %>%
+    summarize(
+      MeanProb = mean(Probability, na.rm = TRUE),
+      SD = sd(Probability, na.rm = TRUE),
+      SEM = SD / sqrt(n()),
+      .groups = 'drop'
     )
   
-  plot_title <- paste("Strategy Use:", current_group$Sex, current_group$APP, "Age:", current_group$AgeCat)
+  groups_to_plot <- unique(group_day_summary2 %>% select(Sex, APP, AgeCat))
   
-  plt <- ggplot(summary_data, aes(x = as.factor(`_Day`), y = MeanProb, fill = StratCat)) +
-    geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8, alpha = 0.5) +
-    geom_jitter(data = rat_data,
-                aes(x = as.factor(`_Day`), y = Probability, color = StratCat),
-                position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.9),
-                alpha = 0.8, size = 2, inherit.aes = FALSE) +
-    geom_errorbar(aes(ymin = MeanProb - SEM, ymax = MeanProb + SEM),
-                  width = 0.2, position = position_dodge(width = 0.9)) +
-    labs(
-      title = plot_title,
-      x = "Day",
-      y = "Probability of Strategy Use",
-      fill = "Strategy Category",
-      color = "Strategy Category"
-    ) +
-    scale_fill_manual(values = strat_cat_colors) +
-    scale_color_manual(values = strat_cat_colors) +
-    coord_cartesian(ylim = c(0, 1)) +
-    theme_minimal(base_size = 14)
-  
-  print(plt)
-  
-  # Save plot to Figures folder
-  # safe_title <- gsub("[^A-Za-z0-9_]", "_", plot_title)
-  # file_path <- file.path(fig_folder, paste0("AvgStratCatUse_Day_Sex_Genotype_Age", safe_title, ".jpeg"))
-  # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
+  for(i in seq_len(nrow(groups_to_plot))) {
+    current_group <- groups_to_plot[i, ]
+    
+    summary_data <- group_day_summary2 %>%
+      filter(
+        Sex == current_group$Sex,
+        APP == current_group$APP,
+        AgeCat == current_group$AgeCat
+      )
+    
+    rat_data <- rat_day_long2 %>%
+      filter(
+        Sex == current_group$Sex,
+        APP == current_group$APP,
+        AgeCat == current_group$AgeCat
+      )
+    
+    plot_title <- paste("Strategy Use:", current_group$Sex, current_group$APP, "Age:", current_group$AgeCat)
+    
+    plt <- ggplot(summary_data, aes(x = as.factor(`_Day`), y = MeanProb, fill = StratCat)) +
+      geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8, alpha = 0.5) +
+      geom_jitter(data = rat_data,
+                  aes(x = as.factor(`_Day`), y = Probability, color = StratCat),
+                  position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.9),
+                  alpha = 0.8, size = 2, inherit.aes = FALSE) +
+      geom_errorbar(aes(ymin = MeanProb - SEM, ymax = MeanProb + SEM),
+                    width = 0.2, position = position_dodge(width = 0.9)) +
+      labs(
+        title = plot_title,
+        x = "Day",
+        y = "Probability of Strategy Use",
+        fill = "Strategy Category",
+        color = "Strategy Category"
+      ) +
+      scale_fill_manual(values = strat_cat_colors) +
+      scale_color_manual(values = strat_cat_colors) +
+      coord_cartesian(ylim = c(0, 1)) +
+      theme_minimal(base_size = 14)
+    
+    print(plt)
+    
+    # Save plot to Figures folder
+    # safe_title <- gsub("[^A-Za-z0-9_]", "_", plot_title)
+    # file_path <- file.path(fig_folder, paste0("AvgStratCatUse_Day_Sex_Genotype_Age", safe_title, ".jpeg"))
+    # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
+  }
 }
-
 
 
 # Across Days StratCat Line Plots -----------------------------------------
@@ -649,8 +755,117 @@ plot_procedural_strategies(procedural_summary, sex_filter = "F", title_prefix = 
 # Males only
 plot_procedural_strategies(procedural_summary, sex_filter = "M", title_prefix = "Male_", save_folder = fig_folder)
 
+# ANOVA: strat use x genotype x sex ---------------------------------------
+
+strategyuse_genotype_sex_anova <- function() {
+  # Open sink to save all console output to a file
+  sink("/Users/miasponseller/Desktop/tg_anova.txt")
+  
+  # Filter and prepare data as before
+  rat_strategy_avg <- strat_sheet %>%
+    filter(Age %in% c("4", "5", "6", "7", "8", "9", "10", "11", "12")) %>%
+    group_by(`_TargetID`, StratCat, Sex, Age, APP) %>%
+    summarize(
+      MeanProb = mean(case_when(
+        StratCat == "Allocentric" ~ AllocentricProb,
+        StratCat == "Procedural" ~ ProceduralProb,
+        StratCat == "NonGoalOriented" ~ NonGoalOrientedProb,
+        TRUE ~ NA_real_
+      ), na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    rename(TargetID = `_TargetID`) %>%
+    mutate(
+      Age = factor(Age),
+      Sex = factor(Sex),
+      APP = factor(APP),
+      StratCat = factor(StratCat, levels = c("NonGoalOriented", "Procedural", "Allocentric"))
+    )
+  
+  # Run ANOVA loop, output goes to file
+  for (strat in levels(rat_strategy_avg$StratCat)) {
+    cat("\n\n### ANOVA for strategy category:", strat, "###\n")
+    
+    df <- rat_strategy_avg %>% filter(StratCat == strat)
+    
+    anova_res <- aov_ez(
+      id = "TargetID",
+      dv = "MeanProb",
+      data = df,
+      between = c("Sex", "Age", "APP")
+    )
+    
+    print(anova_res)
+    
+    emm <- emmeans(anova_res, ~ Sex * Age * APP)
+    print(emm)
+    
+    cat("\nPairwise comparisons by Age within Sex × APP:\n")
+    print(pairs(emm, by = c("Sex", "APP")))
+    
+    cat("\nPairwise comparisons by Sex within Age × APP:\n")
+    print(pairs(emm, by = c("Age", "APP")))
+    
+    cat("\nPairwise comparisons by APP within Sex × Age:\n")
+    print(pairs(emm, by = c("Sex", "Age")))
+  }
+  
+  # Close the sink to return output to console
+  sink()
+}
 
 
+# Single Day ANOVA --------------------------------------------------------
 
+# Open sink to save all console output to a file
+sink("/Users/miasponseller/Desktop/tg_anova_single_day.txt")
 
+# Filter and prepare data as before
+rat_strategy_avg_day <- strat_sheet %>%
+  group_by(`_TargetID`, StratCat, Sex, Age, APP) %>%
+  summarize(
+    MeanProb = mean(case_when(
+      StratCat == "Allocentric" ~ AllocentricProb,
+      StratCat == "Procedural" ~ ProceduralProb,
+      StratCat == "NonGoalOriented" ~ NonGoalOrientedProb,
+      TRUE ~ NA_real_
+    ), na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  rename(TargetID = `_TargetID`) %>%
+  mutate(
+    Age = factor(Age),
+    Sex = factor(Sex),
+    APP = factor(APP),
+    StratCat = factor(StratCat, levels = c("NonGoalOriented", "Procedural", "Allocentric"))
+  )
 
+# Run ANOVA loop, output goes to file
+for (strat in levels(rat_strategy_avg_day$StratCat)) {
+  cat("\n\n### ANOVA for strategy category:", strat, "###\n")
+  
+  df <- rat_strategy_avg_day %>% filter(StratCat == strat)
+  
+  anova_res <- aov_ez(
+    id = "TargetID",
+    dv = "MeanProb",
+    data = df,
+    between = c("Sex", "Age", "APP")
+  )
+  
+  print(anova_res)
+  
+  emm <- emmeans(anova_res, ~ Sex * Age * APP)
+  print(emm)
+  
+  cat("\nPairwise comparisons by Age within Sex × APP:\n")
+  print(pairs(emm, by = c("Sex", "APP")))
+  
+  cat("\nPairwise comparisons by Sex within Age × APP:\n")
+  print(pairs(emm, by = c("Age", "APP")))
+  
+  cat("\nPairwise comparisons by APP within Sex × Age:\n")
+  print(pairs(emm, by = c("Sex", "Age")))
+}
+
+sink()
