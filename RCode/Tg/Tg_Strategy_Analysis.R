@@ -760,7 +760,7 @@ plot_procedural_strategies(procedural_summary, sex_filter = "M", title_prefix = 
 
 sex_agegroup_genotype_anova <- function() {
   
-  fp <- '/Users/miasponseller/Desktop/tg_anova_no_old.txt'
+  fp <- '/Users/miasponseller/Desktop/tg_anova_no_old_day4.txt'
   # Open sink to save all console output to a file
   sink(fp)
   
@@ -768,7 +768,7 @@ sex_agegroup_genotype_anova <- function() {
   rat_strategy_avg <- strat_sheet %>%
     group_by(`_TargetID`, StratCat, Sex, AgeGroup, APP) %>%
     filter(AgeGroup %in% c('Young', 'Middle')) %>% # Exclude old age group
-    #filter(`_Day` == 4) %>% # Filter to a specific day
+    filter(`_Day` == 4) %>% # Filter to a specific day
     summarize(
       MeanProb = mean(case_when(
         StratCat == "Allocentric" ~ AllocentricProb,
@@ -799,7 +799,7 @@ sex_agegroup_genotype_anova <- function() {
       between = c("Sex", "AgeGroup", "APP")
     )
     
-    print(anova_res)
+    print(anova_res$anova_table)
     
     emm <- emmeans(anova_res, ~ Sex * AgeGroup * APP)
     print(emm)
@@ -859,7 +859,7 @@ agegroup_genotype_anova <- function() {
       between = c("AgeGroup", "APP")
     )
     
-    print(anova_res)
+    print(anova_res$anova_table)
     
     emm <- emmeans(anova_res, ~ AgeGroup * APP)
     print(emm)
