@@ -755,16 +755,20 @@ plot_procedural_strategies(procedural_summary, sex_filter = "F", title_prefix = 
 # Males only
 plot_procedural_strategies(procedural_summary, sex_filter = "M", title_prefix = "Male_", save_folder = fig_folder)
 
-# ANOVA: strat use x genotype x sex ---------------------------------------
 
-strategyuse_genotype_sex_anova <- function() {
+# ANOVA: Sex x AgeGroup x Genotype (excluding old) ------------------------
+
+sex_agegroup_genotype_anova <- function() {
+  
+  fp <- '/Users/miasponseller/Desktop/tg_anova_no_old.txt'
   # Open sink to save all console output to a file
-  sink("/Users/miasponseller/Desktop/tg_anova.txt")
+  sink(fp)
   
   # Filter and prepare data as before
   rat_strategy_avg <- strat_sheet %>%
-    filter(Age %in% c("4", "5", "6", "7", "8", "9", "10", "11", "12")) %>%
-    group_by(`_TargetID`, StratCat, Sex, Age, APP) %>%
+    group_by(`_TargetID`, StratCat, Sex, AgeGroup, APP) %>%
+    filter(AgeGroup %in% c('Young', 'Middle')) %>% # Exclude old age group
+    #filter(`_Day` == 4) %>% # Filter to a specific day
     summarize(
       MeanProb = mean(case_when(
         StratCat == "Allocentric" ~ AllocentricProb,
@@ -776,7 +780,7 @@ strategyuse_genotype_sex_anova <- function() {
     ) %>%
     rename(TargetID = `_TargetID`) %>%
     mutate(
-      Age = factor(Age),
+      AgeGroup = factor(AgeGroup),
       Sex = factor(Sex),
       APP = factor(APP),
       StratCat = factor(StratCat, levels = c("NonGoalOriented", "Procedural", "Allocentric"))
@@ -792,80 +796,84 @@ strategyuse_genotype_sex_anova <- function() {
       id = "TargetID",
       dv = "MeanProb",
       data = df,
-      between = c("Sex", "Age", "APP")
+      between = c("Sex", "AgeGroup", "APP")
     )
     
     print(anova_res)
     
-    emm <- emmeans(anova_res, ~ Sex * Age * APP)
+    emm <- emmeans(anova_res, ~ Sex * AgeGroup * APP)
     print(emm)
     
-    cat("\nPairwise comparisons by Age within Sex × APP:\n")
+    cat("\nPairwise comparisons by AgeGroup within Sex × APP:\n")
     print(pairs(emm, by = c("Sex", "APP")))
     
-    cat("\nPairwise comparisons by Sex within Age × APP:\n")
-    print(pairs(emm, by = c("Age", "APP")))
+    cat("\nPairwise comparisons by Sex within AgeGroup × APP:\n")
+    print(pairs(emm, by = c("AgeGroup", "APP")))
     
-    cat("\nPairwise comparisons by APP within Sex × Age:\n")
-    print(pairs(emm, by = c("Sex", "Age")))
+    cat("\nPairwise comparisons by APP within Sex × AgeGroup:\n")
+    print(pairs(emm, by = c("Sex", "AgeGroup")))
   }
   
-  # Close the sink to return output to console
   sink()
+  message('ANOVA results saved to: ', fp)
 }
 
+sex_agegroup_genotype_anova()
 
-# Single Day ANOVA --------------------------------------------------------
 
-# Open sink to save all console output to a file
-sink("/Users/miasponseller/Desktop/tg_anova_single_day.txt")
+# ANOVA: AgeGroup x Genotype ----------------------------------------------
 
-# Filter and prepare data as before
-rat_strategy_avg_day <- strat_sheet %>%
-  group_by(`_TargetID`, StratCat, Sex, Age, APP) %>%
-  summarize(
-    MeanProb = mean(case_when(
-      StratCat == "Allocentric" ~ AllocentricProb,
-      StratCat == "Procedural" ~ ProceduralProb,
-      StratCat == "NonGoalOriented" ~ NonGoalOrientedProb,
-      TRUE ~ NA_real_
-    ), na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  rename(TargetID = `_TargetID`) %>%
-  mutate(
-    Age = factor(Age),
-    Sex = factor(Sex),
-    APP = factor(APP),
-    StratCat = factor(StratCat, levels = c("NonGoalOriented", "Procedural", "Allocentric"))
-  )
-
-# Run ANOVA loop, output goes to file
-for (strat in levels(rat_strategy_avg_day$StratCat)) {
-  cat("\n\n### ANOVA for strategy category:", strat, "###\n")
+agegroup_genotype_anova <- function() {
+  fp <- "/Users/miasponseller/Desktop/tg_anova_no_sex.txt"
   
-  df <- rat_strategy_avg_day %>% filter(StratCat == strat)
+  sink(fp)
   
-  anova_res <- aov_ez(
-    id = "TargetID",
-    dv = "MeanProb",
-    data = df,
-    between = c("Sex", "Age", "APP")
-  )
+  rat_strategy_avg <- strat_sheet %>%
+    group_by(`_TargetID`, StratCat, Sex, AgeGroup, APP) %>%
+    summarize(
+      MeanProb = mean(case_when(
+        StratCat == "Allocentric" ~ AllocentricProb,
+        StratCat == "Procedural" ~ ProceduralProb,
+        StratCat == "NonGoalOriented" ~ NonGoalOrientedProb,
+        TRUE ~ NA_real_
+      ), na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    rename(TargetID = `_TargetID`) %>%
+    mutate(
+      AgeGroup = factor(AgeGroup),
+      APP = factor(APP),
+      StratCat = factor(StratCat, levels = c("NonGoalOriented", "Procedural", "Allocentric"))
+    )
   
-  print(anova_res)
+  # Run ANOVA loop
+  for (strat in levels(rat_strategy_avg$StratCat)) {
+    cat("\n\n### ANOVA for strategy category:", strat, " (excluding Sex) ###\n")
+    
+    df <- rat_strategy_avg %>% filter(StratCat == strat)
+    
+    anova_res <- aov_ez(
+      id = "TargetID",
+      dv = "MeanProb",
+      data = df,
+      between = c("AgeGroup", "APP")
+    )
+    
+    print(anova_res)
+    
+    emm <- emmeans(anova_res, ~ AgeGroup * APP)
+    print(emm)
+    
+    cat("\nPairwise comparisons by AgeGroup within APP:\n")
+    print(pairs(emm, by = "APP"))
+    
+    cat("\nPairwise comparisons by APP within AgeGroup:\n")
+    print(pairs(emm, by = "AgeGroup"))
+  }
   
-  emm <- emmeans(anova_res, ~ Sex * Age * APP)
-  print(emm)
-  
-  cat("\nPairwise comparisons by Age within Sex × APP:\n")
-  print(pairs(emm, by = c("Sex", "APP")))
-  
-  cat("\nPairwise comparisons by Sex within Age × APP:\n")
-  print(pairs(emm, by = c("Age", "APP")))
-  
-  cat("\nPairwise comparisons by APP within Sex × Age:\n")
-  print(pairs(emm, by = c("Sex", "Age")))
+  sink()
+  message("ANOVA results saved to: ", fp)
 }
 
-sink()
+agegroup_genotype_anova()
+
