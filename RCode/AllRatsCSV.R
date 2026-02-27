@@ -3,6 +3,7 @@ library(dplyr)
 library(stringr)
 library(purrr)
 library(writexl)
+library(tidyr)
 
 # Folder with all ANY-Maze spreadsheets, which should include Key and Spatial sheets.
 # Key columns: BarnesID or CowenID, Age
@@ -47,10 +48,10 @@ for (file_path in spatial_files) {
     
     id_cols <- intersect(c('BarnesID', 'CowenID'), colnames(key_df))
     if (length(id_cols) == 0) {
-      stop(paste('No valid ID columns (BarnesID or CowenID) found in', file_name))
+      stop(paste('No valid ID columns (Barnes ID or Cowen ID) found in', file_name))
     }
     
-    key_df <- key_df %>% select(all_of(c(id_cols, 'Sex', 'APP', 'Age')))
+    key_df <- key_df %>% select(all_of(c(id_cols, 'Sex', 'APP', 'Age'))) # columns you want to select from Key sheet
     
     
     # Pivot to long format

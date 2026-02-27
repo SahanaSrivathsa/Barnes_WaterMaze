@@ -8,7 +8,7 @@ trials_dir <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks' # folde
 strat_export_fp <- paste0("/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_", format(Sys.Date(), "%m-%d-%Y"), ".xlsx") # output file path
 
 cohort_list <- read_excel(all_rats_desc_fp) %>% 
-  pull(Cohort) %>% 
+  pull(Cohort) %>%
   unique() %>% 
   sort()
 

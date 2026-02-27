@@ -14,9 +14,11 @@ library(car)
 # MUST RUN ----------------------------------------------------------------
 
 # Load data
-strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_06-17-2025.xlsx')
+strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_02-01-2026.xlsx')
 all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv')
 description_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx'
+
+strat_sheet$Age = as.numeric(strat_sheet$Age)
 
 # Add if running Rtrack plots
 all_trials <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks'
@@ -37,44 +39,44 @@ n_male = sex_counts$n[sex_counts$Sex == 'M']
 n_female = sex_counts$n[sex_counts$Sex == 'F']
 
 # Strategy categories
-non_goal_oriented <- c('thigmotaxis', 'circling', 'random path')
+platform_independent <- c('thigmotaxis', 'circling', 'random path')
 procedural <- c('scanning', 'chaining')
 allocentric <- c('directed search', 'corrected path', 'direct path')
 
 list_of_strats = c('direct path', 'corrected path', 'directed search', 'chaining', 
                    'scanning', 'random path', 'circling', 'thigmotaxis')
 
-list_of_strat_cats = c('Allocentric', 'Procedural', 'NonGoalOriented')
+list_of_strat_cats = c('Allocentric', 'Procedural', 'PlatformIndependent')
 
 # Add StratCat, AgeCat, AgeGroup, and Group columns
 strat_sheet <- strat_sheet %>% 
   mutate(
     StratCat = case_when(
-      name %in% non_goal_oriented ~ 'NonGoalOriented',
+      name %in% platform_independent ~ 'PlatformIndependent',
       name %in% procedural ~ 'Procedural',
       name %in% allocentric ~ 'Allocentric'
     )) %>% 
   mutate(
     AgeCat = case_when(
-      Age %in% c(4, 5, 6) ~ '5',
-      Age %in% c(7, 8, 9) ~ '8', 
-      Age %in% c(10, 11, 12) ~ '11',
-      Age %in% c(13, 14) ~ '13.5',
-      Age %in% c(15, 16) ~ '15.5',
-      Age %in% c(20) ~ '20'
+      Age < 7  ~ '5',
+      Age >= 7 & Age < 10 ~ '8', 
+      Age >= 10 & Age < 13 ~ '11',
+      Age >= 13 & Age < 15 ~ '13.5',
+      Age>= 15 & Age < 16 ~ '15.5',
+      Age >= 20 ~ '20'
     )) %>% 
   mutate(Group = paste0(Sex, '-', APP)) %>% 
   mutate(
     AgeGroup = case_when(
-      Age %in% c(4, 5, 6, 7, 8) ~ 'Young',
-      Age %in% c(9, 10, 11, 12, 13, 14) ~ 'Middle',
-      Age %in% c(15,16, 17, 18, 19, 20, 21, 22) ~ 'Old'
+      Age < 9 ~ 'Young',
+      Age >= 9 & Age < 15 ~ 'Middle',
+      Age >= 15 ~ 'Old'
     )
   )
 
 # StratCat levels
 strat_sheet$StratCat <- factor(
-  strat_sheet$StratCat, levels = c('NonGoalOriented', 'Procedural', 'Allocentric')
+  strat_sheet$StratCat, levels = c('PlatformIndependent', 'Procedural', 'Allocentric')
 )
 
 # Group levels
@@ -91,8 +93,8 @@ age_cats <- c("5", "8", "11", "13.5", "15.5", "20")
 sexes <- c("F", "M")
 sex_age_groups <- as.vector(outer(sexes, age_cats, paste, sep = "-"))
 
-# Add Allocentric, Procedural, and Non-Goal Oriented columns with avg prob for trial
-strat_sheet$NonGoalOrientedProb <- rowSums(strat_sheet[,non_goal_oriented])
+# Add Allocentric, Procedural, and PlatformIndependent columns with avg prob for trial
+strat_sheet$PlatformIndependentProb <- rowSums(strat_sheet[,platform_independent])
 strat_sheet$ProceduralProb <- rowSums(strat_sheet[,procedural])
 strat_sheet$AllocentricProb <- rowSums(strat_sheet[,allocentric])
 
@@ -111,7 +113,7 @@ strat_colors <- c(
 strat_cat_colors <- c(
   'Allocentric' = '#1b7837',
   'Procedural' = '#ffd700',
-  'NonGoalOriented' = '#654321'
+  'PlatformIndependent' = '#654321'
 )
 
 sex_age_colors <- c(
@@ -152,6 +154,7 @@ group_summary <- strat_sheet %>%
   pivot_wider(names_from = AgeCat, values_from = n, values_fill = 0) %>%
   mutate(n_animals = rowSums(across(-Group))) %>%
   relocate(Group, n_animals, '5', '8', '11', '15.5', '20')
+
 totals_row <- group_summary %>%
   summarise(across(where(is.numeric), sum)) %>%
   mutate(Group = "TOTAL") %>%
@@ -186,7 +189,7 @@ r_track_strat_plots <- function() {
   #Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Cohort")
   
   # Strategy plots, by Age
-  Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Sex")
+  Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Genotype")
   
   print("Plots successfully created")
 }
@@ -244,6 +247,8 @@ strategy_proportions_graphs <- function() {
   }
 }
 
+strategy_proportions_graphs()
+
 # Prob Strat Cat Sex/Genotype ---------------------------------------------
 
 sex_genotype <- function() {
@@ -253,18 +258,18 @@ sex_genotype <- function() {
     summarize(
       Allocentric = mean(AllocentricProb, na.rm = TRUE),
       Procedural = mean(ProceduralProb, na.rm = TRUE),
-      NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
+      PlatformIndependent = mean(PlatformIndependentProb, na.rm = TRUE),
       .groups = 'drop'
     )
   
   # Pivot long
   rat_day_long <- rat_day_avg %>% 
-    pivot_longer(cols = c(Allocentric, Procedural, NonGoalOriented),
+    pivot_longer(cols = c(Allocentric, Procedural, PlatformIndependent),
                  names_to = 'StratCat',
                  values_to = 'Probability') %>% 
     mutate(StratCat = factor(
       StratCat,
-      levels = c('NonGoalOriented', 'Procedural', 'Allocentric')
+      levels = c('PlatformIndependent', 'Procedural', 'Allocentric')
     ))
   
   group_day_summary <- rat_day_long %>% 
@@ -301,14 +306,18 @@ sex_genotype <- function() {
       pairwise_t_test(
         Probability ~ DayFactor,
         p.adjust.method = "bonferroni"
+      ) %>%
+      rename(
+        DayNum1 = group1,
+        DayNum2 = group2
       )
     
     # Print all day pairs tested
     cat("\n=== All day pairs being compared for Group:", g, "===\n")
     pvals_df_all %>%
-      select(StratCat, group1, group2) %>%
+      select(StratCat, DayNum1, DayNum2) %>%
       distinct() %>%
-      arrange(StratCat, group1, group2) %>%
+      arrange(StratCat, DayNum1, DayNum2) %>%
       print(n = Inf)
     
     # Filter significant pairs and add labels
@@ -324,15 +333,15 @@ sex_genotype <- function() {
       filter(!is.na(p.adj.label)) %>%
       mutate(
         y.position = case_when(
-          StratCat == "NonGoalOriented" ~ 0.8,
+          StratCat == "PlatformIndependent" ~ 0.8,
           StratCat == "Procedural" ~ 0.9,
           StratCat == "Allocentric" ~ 1.0
-        ) + as.numeric(factor(paste(group1, group2, sep = "_"))) * 0.025
+        ) + as.numeric(factor(paste(DayNum1, DayNum2, sep = "_"))) * 0.025
       )
     
     # Calculate dodge offsets
     dodge_width <- 0.9
-    strat_levels <- c('NonGoalOriented', 'Procedural', 'Allocentric')
+    strat_levels <- c('PlatformIndependent', 'Procedural', 'Allocentric')
     n_strat <- length(strat_levels)
     bar_width <- dodge_width / n_strat
     dodge_offsets <- setNames(
@@ -340,22 +349,22 @@ sex_genotype <- function() {
       strat_levels
     )
     
-    # Ensure group1 and group2 factors have correct levels
+    # Ensure DayNum1 and DayNum2 factors have correct levels
     levels_day <- levels(rat_data$DayFactor)
     
     pvals_df <- pvals_df %>%
       mutate(
-        group1 = factor(group1, levels = levels_day),
-        group2 = factor(group2, levels = levels_day),
-        group1_num = as.numeric(group1),
-        group2_num = as.numeric(group2),
-        xmin = group1_num + dodge_offsets[StratCat],
-        xmax = group2_num + dodge_offsets[StratCat]
+        DayNum1 = factor(DayNum1, levels = levels_day),
+        DayNum2 = factor(DayNum2, levels = levels_day),
+        DayNum1_num = as.numeric(DayNum1),
+        DayNum2_num = as.numeric(DayNum2),
+        xmin = DayNum1_num + dodge_offsets[StratCat],
+        xmax = DayNum2_num + dodge_offsets[StratCat]
       )
     
     # Print significant p-values
     cat("\n=== Significant pairwise p-values for Group:", g, "===\n")
-    print(pvals_df %>% select(StratCat, group1, group2, p, p.adj, p.adj.label))
+    print(pvals_df %>% select(StratCat, DayNum1, DayNum2, p, p.adj, p.adj.label))
     
     # Plot
     plt <- ggplot(summary_data, aes(x = as.factor(`_Day`), y = MeanProb, fill = StratCat)) +
@@ -367,7 +376,11 @@ sex_genotype <- function() {
       geom_errorbar(aes(ymin = MeanProb - SEM, ymax = MeanProb + SEM),
                     width = .2, position = position_dodge(width = dodge_width)) +
       stat_pvalue_manual(
-        pvals_df,
+        data = pvals_df %>%
+          rename(
+            group1 = DayNum1,
+            group2 = DayNum2
+          ),
         label = "p.adj.label",
         y.position = "y.position",
         xmin = "xmin",
@@ -398,6 +411,8 @@ sex_genotype <- function() {
   }
 }
 
+sex_genotype()
+
 # Prob StratCat Sex/Genotype/AgeCat ---------------------------------------
 
 sex_genoetype_agecat <- function() {
@@ -407,20 +422,20 @@ sex_genoetype_agecat <- function() {
     summarize(
       Allocentric = mean(AllocentricProb, na.rm = TRUE),
       Procedural = mean(ProceduralProb, na.rm = TRUE),
-      NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
+      PlatformIndependent = mean(PlatformIndependentProb, na.rm = TRUE),
       .groups = 'drop'
     )
   
   # Pivot long
   rat_day_long2 <- rat_day_avg2 %>%
     pivot_longer(
-      cols = c(Allocentric, Procedural, NonGoalOriented),
+      cols = c(Allocentric, Procedural, PlatformIndependent),
       names_to = 'StratCat',
       values_to = 'Probability'
     ) %>%
     mutate(StratCat = factor(
       StratCat,
-      levels = c('NonGoalOriented', 'Procedural', 'Allocentric')
+      levels = c('PlatformIndependent', 'Procedural', 'Allocentric')
     ))
   
   # Summary for plotting
@@ -483,6 +498,7 @@ sex_genoetype_agecat <- function() {
   }
 }
 
+sex_genoetype_agecat()
 
 # Across Days StratCat Line Plots -----------------------------------------
 
@@ -491,20 +507,20 @@ rat_day_avg2 <- strat_sheet %>%
   summarize(
     Allocentric = mean(AllocentricProb, na.rm = TRUE),
     Procedural = mean(ProceduralProb, na.rm = TRUE),
-    NonGoalOriented = mean(NonGoalOrientedProb, na.rm = TRUE),
+    PlatformIndependent = mean(PlatformIndependentProb, na.rm = TRUE),
     .groups = 'drop'
   )
 
 # Pivot long
 rat_day_long2 <- rat_day_avg2 %>%
   pivot_longer(
-    cols = c(Allocentric, Procedural, NonGoalOriented),
+    cols = c(Allocentric, Procedural, PlatformIndependent),
     names_to = 'StratCat',
     values_to = 'Probability'
   ) %>%
   mutate(StratCat = factor(
     StratCat,
-    levels = c('NonGoalOriented', 'Procedural', 'Allocentric')
+    levels = c('PlatformIndependent', 'Procedural', 'Allocentric')
   ))
 
 # Summary for plotting
@@ -760,7 +776,7 @@ plot_procedural_strategies(procedural_summary, sex_filter = "M", title_prefix = 
 
 sex_agegroup_genotype_anova <- function() {
   
-  fp <- '/Users/miasponseller/Desktop/tg_anova_no_old_day4.txt'
+  fp <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/tg_anova_no_old_day4.txt'
   # Open sink to save all console output to a file
   sink(fp)
   
@@ -773,7 +789,7 @@ sex_agegroup_genotype_anova <- function() {
       MeanProb = mean(case_when(
         StratCat == "Allocentric" ~ AllocentricProb,
         StratCat == "Procedural" ~ ProceduralProb,
-        StratCat == "NonGoalOriented" ~ NonGoalOrientedProb,
+        StratCat == "PlatformIndependent" ~ PlatformIndependentProb,
         TRUE ~ NA_real_
       ), na.rm = TRUE),
       .groups = "drop"
@@ -783,7 +799,7 @@ sex_agegroup_genotype_anova <- function() {
       AgeGroup = factor(AgeGroup),
       Sex = factor(Sex),
       APP = factor(APP),
-      StratCat = factor(StratCat, levels = c("NonGoalOriented", "Procedural", "Allocentric"))
+      StratCat = factor(StratCat, levels = c("PlatformIndependent", "Procedural", "Allocentric"))
     )
   
   # Run ANOVA loop, output goes to file
@@ -824,7 +840,7 @@ sex_agegroup_genotype_anova()
 # ANOVA: AgeGroup x Genotype ----------------------------------------------
 
 agegroup_genotype_anova <- function() {
-  fp <- "/Users/miasponseller/Desktop/tg_anova_no_sex.txt"
+  fp <- "/Users/miasponseller/Desktop/Lab/Rtrack/tg_anova_no_sex.txt"
   
   sink(fp)
   
@@ -834,7 +850,7 @@ agegroup_genotype_anova <- function() {
       MeanProb = mean(case_when(
         StratCat == "Allocentric" ~ AllocentricProb,
         StratCat == "Procedural" ~ ProceduralProb,
-        StratCat == "NonGoalOriented" ~ NonGoalOrientedProb,
+        StratCat == "PlatformIndependent" ~ PlatformIndependentProb,
         TRUE ~ NA_real_
       ), na.rm = TRUE),
       .groups = "drop"
@@ -843,7 +859,7 @@ agegroup_genotype_anova <- function() {
     mutate(
       AgeGroup = factor(AgeGroup),
       APP = factor(APP),
-      StratCat = factor(StratCat, levels = c("NonGoalOriented", "Procedural", "Allocentric"))
+      StratCat = factor(StratCat, levels = c("PlatformIndependent", "Procedural", "Allocentric"))
     )
   
   # Run ANOVA loop
@@ -877,3 +893,125 @@ agegroup_genotype_anova <- function() {
 
 agegroup_genotype_anova()
 
+
+# Day vs. Prob StratCat Use - Sex/Genotype --------------------------------
+
+plot_strategy_probabilities <- function() {
+  long_data <- strat_sheet %>% 
+    filter(as.numeric(strat_sheet$Age) < 19) %>% 
+    pivot_longer(cols = c(PlatformIndependentProb, ProceduralProb, AllocentricProb),
+                 names_to = "StrategyCategory",
+                 values_to = "Probability")
+  
+  # average across trials for each rat
+  rat_avg <- long_data %>%
+    group_by(`_TargetID`, Group, `_Day`, StrategyCategory) %>%
+    summarize(rat_mean_prob = mean(Probability, na.rm = TRUE), .groups = "drop")
+  
+  # group means and SE (across rats)
+  plot_data <- rat_avg %>%
+    group_by(Group, `_Day`, StrategyCategory) %>%
+    summarize(mean_prob = mean(rat_mean_prob, na.rm = TRUE),
+              se = sd(rat_mean_prob, na.rm = TRUE) / sqrt(n()),
+              n_rats = n(),
+              .groups = "drop")
+  
+  ggplot(plot_data, aes(x = factor(`_Day`),
+                        y = mean_prob,
+                        fill = Group)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+    geom_errorbar(aes(ymin = mean_prob - se, ymax = mean_prob + se),
+                  position = position_dodge(width = 0.8), width = 0.2) +
+    facet_wrap(~ StrategyCategory, ncol = 1) +
+    scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    labs(x = "Day",
+         y = "Average Probability of Strategy Use (per rat)",
+         fill = "Group (Sex × Genotype)") +
+    theme_bw(base_size = 14) +
+    theme(strip.background = element_rect(fill = "gray90", color = "gray60"),
+          panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank())
+}
+
+plot_strategy_probabilities()
+
+
+# Age vs. Prob StratCat Use Line Plots ------------------------------------
+
+# Day 4 mean PlatformIndependentProb by Age / Sex / APP -------------------
+
+platformindependent_prob_day4 <- strat_sheet %>% 
+  filter(`_Day` == 4) %>% 
+  group_by(Age, Sex, APP) %>% 
+  summarize(
+    prob = mean(PlatformIndependentProb, na.rm = TRUE),
+    .groups = "drop"
+  ) %>% 
+  mutate(Group = paste(Sex, APP, sep = "_"))
+
+ggplot(platformindependent_prob_day4,
+       aes(x = Age, y = prob,
+           color = Group,
+           group = Group)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Day 4 Mean Platform-Independent Probability by Age",
+    x = "Age",
+    y = "Mean Probability",
+    color = "Sex / Genotype"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 1))
+
+# Day 4 mean ProceduralProb by Age / Sex / APP -------------------
+
+procedural_prob_day4 <- strat_sheet %>% 
+  filter(`_Day` == 4) %>% 
+  group_by(Age, Sex, APP) %>% 
+  summarize(
+    prob = mean(ProceduralProb, na.rm = TRUE),
+    .groups = "drop"
+  ) %>% 
+  mutate(Group = paste(Sex, APP, sep = "_"))
+
+ggplot(procedural_prob_day4,
+       aes(x = Age, y = prob,
+           color = Group,
+           group = Group)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Day 4 Mean Procedural Probability by Age",
+    x = "Age",
+    y = "Mean Probability",
+    color = "Sex / Genotype"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 1))
+
+# Day 4 mean AllocentricProb by Age / Sex / APP -------------------
+
+allocentric_prob_day4 <- strat_sheet %>% 
+  filter(`_Day` == 4) %>% 
+  group_by(Age, Sex, APP) %>% 
+  summarize(
+    prob = mean(AllocentricProb, na.rm = TRUE),
+    .groups = "drop"
+  ) %>% 
+  mutate(Group = paste(Sex, APP, sep = "_"))
+
+ggplot(allocentric_prob_day4,
+       aes(x = Age, y = prob,
+           color = Group,
+           group = Group)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Day 4 Mean Allocentric Probability by Age",
+    x = "Age",
+    y = "Mean Probability",
+    color = "Sex / Genotype"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 1))

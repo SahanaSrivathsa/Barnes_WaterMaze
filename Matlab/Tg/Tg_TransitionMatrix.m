@@ -1,7 +1,7 @@
 %% ------------- MUST RUN SECTION FOR ALL FURTHER ANALYSIS ------------- %%
 
 % Dirs
-base_dir='/Users/miasponseller/Desktop/Lab/Rtrack/CAS';
+base_dir='/Users/miasponseller/Desktop/Lab/Rtrack/Tg';
 processed_dir=fullfile(base_dir,'StrategyProcessed');
 fig_dir=fullfile(base_dir,'Figures');
 fig_trans_dir=fullfile(fig_dir,'Transition');
@@ -10,7 +10,7 @@ if~exist(fig_trans_dir,'dir')
 end
 
 % Load data from excel files
-data1 = readtable(fullfile(base_dir,'CAS_MWM_results_05-28-2025.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
+data1 = readtable(fullfile(base_dir,'Tg_MWM_results_06-17-2025.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
 data2 = readtable(fullfile(base_dir,'CAS_AllRats_Spatial.csv'));  % From Matlab Analysis contains Test_No, Cohort, Platform_CIPL
 
 % Define the strategy column names (adjust names if needed)

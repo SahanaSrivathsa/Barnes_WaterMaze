@@ -38,7 +38,7 @@ filtered_df <- df %>% filter(`_TargetID` %in% valid_animals)
 # Select output columns
 output_columns <- c(
   '_TrackID', '_TargetID', '_Trial', '_Day', '_TrackFileFormat', 'Sex', 'Cohort', 
-  '_Arena', '_TrackFile', 'APP', 'CIPL', 'Age'
+  '_Arena', '_TrackFile', 'APP', 'Age'
 )
 
 output_df <- filtered_df %>% select(all_of(output_columns))
