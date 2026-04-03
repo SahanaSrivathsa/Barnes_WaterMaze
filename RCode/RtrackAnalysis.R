@@ -11,8 +11,20 @@ rtrack_folder <- '/Users/miasponseller/Desktop/Lab/Rtrack/WMaze'
 # Rat list file path (contains cohort, rat number, and age group)
 rat_list <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/WMaze/Rat_List.csv')
 
+<<<<<<< Updated upstream
 # all trials folder
 all_trials <- '/Users/miasponseller/Desktop/Lab/Rtrack/WMaze/All Trials'
+=======
+# Cohort list and their corresponding file paths
+cohort_list <- c('1O', '1YM', '2M', '2O', '2Y', '3M', '3O', '3Y', '4M', '4O', '4Y',
+                 '5M', '5O', '5Y', '6M', '6O', '6Y', '7M', '7O', '7Y', '8M', '8O',
+                 '8Y', '9M', '9O', '10O', '10YM', '11M', '11O', '11Y', '12O', '12YM', 
+                 '13OP', '13OR', '13YM', '14BR', '14P', '14RP', '15Bk', '15BR', 
+                 '15G', '16B', '16G', '16R')
+cohort_file_paths <- sapply(cohort_list, function(cohort) {
+  file.path(rtrack_folder, "Cohorts", paste0("Cohort", cohort))},
+  USE.NAMES = FALSE)
+>>>>>>> Stashed changes
 
 # all rats experiment description file (if exists, must be an .xlsx)
 all_rats_desc_fp <- file.path(rtrack_folder, "All_Rats.xlsx")
@@ -139,7 +151,11 @@ process_single_path <- function(cohort_num, trial_num, output_folder = "/Users/m
 
 
 # Plot All Paths and Save -------------------------------------------------
+<<<<<<< Updated upstream
 plot_all_paths <- function(cohort_list, output_folder = '/Users/miasponseller/Desktop/Lab/Rtrack/WMaze/All Path Plots') {
+=======
+plot_all_paths <- function(cohort_list, output_folder = "/Users/miasponseller/Desktop/Lab/Rtrack/CAS_Plot_PDFs") {
+>>>>>>> Stashed changes
   # Create output folder if it doesn't exist
   if (!dir.exists(output_folder)) {
     dir.create(output_folder, recursive = TRUE)
@@ -149,12 +165,16 @@ plot_all_paths <- function(cohort_list, output_folder = '/Users/miasponseller/De
   # Iterate through each cohort in the list
   for (cohort in cohort_list) {
     # Define the path to the experiment description file
+<<<<<<< Updated upstream
     desc_file <- file.path(cohort_file_paths[which(cohort_list == cohort)], paste0("cohort", cohort, "_exp_desc.xlsx"))
     #message("Reading description file: ", desc_file)
+=======
+    desc_file <- '/Users/miasponseller/Desktop/CAS_exp_desc.xlsx' #file.path(cohort_file_paths[which(cohort_list == cohort)], paste0("cohort", cohort, "_exp_desc.xlsx"))
+>>>>>>> Stashed changes
     
     # Attempt to read the experiment description file and handle errors
     experiment <- tryCatch({
-      Rtrack::read_experiment(desc_file, data.dir = file.path(cohort_file_paths[which(cohort_list == cohort)], paste0("Cohort", cohort, " Trials")))
+      Rtrack::read_experiment(desc_file, data.dir = file.path('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/All CAS Tracks'))
     }, error = function(e) {
       warning(paste("Error reading experiment for cohort", cohort, ":", e$message))
       return(NULL)
@@ -283,6 +303,10 @@ bulk_density_map <- function() {
 
 #all_rats_experiment_desc_file(cohort_list, cohort_file_paths, rat_list, rtrack_folder)
 #process_single_path(1, 74)
+<<<<<<< Updated upstream
+=======
+#bulk_process_experiment()
+>>>>>>> Stashed changes
 plot_all_paths(cohort_list)
 #bulk_strategy_calling() 
 #strategy_plots()
