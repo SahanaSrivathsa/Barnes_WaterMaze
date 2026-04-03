@@ -945,6 +945,9 @@ platformindependent_prob_day4 <- strat_sheet %>%
   group_by(Age, Sex, APP) %>% 
   summarize(
     prob = mean(PlatformIndependentProb, na.rm = TRUE),
+    sd = sd(PlatformIndependentProb, na.rm = TRUE),
+    n = sum(!is.na(PlatformIndependentProb)),
+    se = sd/sqrt(n),
     .groups = "drop"
   ) %>% 
   mutate(Group = paste(Sex, APP, sep = "_"))
@@ -955,6 +958,7 @@ ggplot(platformindependent_prob_day4,
            group = Group)) +
   geom_point() +
   geom_line() +
+  geom_errorbar(aes(ymin = prob - se, ymax = prob + se), width = .2) + 
   labs(
     title = "Day 4 Mean Platform-Independent Probability by Age",
     x = "Age",
@@ -971,6 +975,9 @@ procedural_prob_day4 <- strat_sheet %>%
   group_by(Age, Sex, APP) %>% 
   summarize(
     prob = mean(ProceduralProb, na.rm = TRUE),
+    sd = sd(ProceduralProb, na.rm = TRUE),
+    n = sum(!is.na(ProceduralProb)),
+    se = sd/sqrt(n),
     .groups = "drop"
   ) %>% 
   mutate(Group = paste(Sex, APP, sep = "_"))
@@ -981,13 +988,14 @@ ggplot(procedural_prob_day4,
            group = Group)) +
   geom_point() +
   geom_line() +
+  geom_errorbar(aes(ymin = prob - se, ymax = prob + se), width = .2) +
   labs(
     title = "Day 4 Mean Procedural Probability by Age",
     x = "Age",
     y = "Mean Probability",
     color = "Sex / Genotype"
   ) +
-  theme_minimal() +
+  theme_() +
   scale_y_continuous(limits = c(0, 1))
 
 # Day 4 mean AllocentricProb by Age / Sex / APP -------------------
@@ -997,6 +1005,9 @@ allocentric_prob_day4 <- strat_sheet %>%
   group_by(Age, Sex, APP) %>% 
   summarize(
     prob = mean(AllocentricProb, na.rm = TRUE),
+    sd = sd(AllocentricProb, na.rm = TRUE),
+    n = sum(!is.na(AllocentricProb)),
+    se = sd/sqrt(n),
     .groups = "drop"
   ) %>% 
   mutate(Group = paste(Sex, APP, sep = "_"))
@@ -1007,6 +1018,7 @@ ggplot(allocentric_prob_day4,
            group = Group)) +
   geom_point() +
   geom_line() +
+  geom_errorbar(aes(ymin = prob - se, ymax = prob + se), width = .2) +
   labs(
     title = "Day 4 Mean Allocentric Probability by Age",
     x = "Age",
@@ -1015,3 +1027,87 @@ ggplot(allocentric_prob_day4,
   ) +
   theme_minimal() +
   scale_y_continuous(limits = c(0, 1))
+
+
+# Single Trial Plot -------------------------------------------------------
+
+arena_single = Rtrack::read_arena('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Arena Files/Cohort1MArena.txt')
+path_single = Rtrack::read_path('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks/Coh1M_Trial205.csv', arena_single, id = 'test205', track.format = 'anymaze.csv')
+metrics_single = Rtrack::calculate_metrics(path_single, arena_single)
+Rtrack::plot_path(metrics_single)
+
+
+# Plot All Paths (Save as PDF) --------------------------------------------
+
+plot_all_paths <- function(output_folder = "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Plot_PDFs") {
+  
+  # Create output folder if it doesn't exist
+  if (!dir.exists(output_folder)) {
+    dir.create(output_folder, recursive = TRUE)
+    message("Created directory: ", output_folder)
+  }
+  
+  desc_file <- "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc_Coh1M.xlsx"
+  data_dir <- "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks"
+  
+  # Read experiment
+  experiment <- tryCatch({
+    Rtrack::read_experiment(desc_file, data.dir = data_dir)
+  }, error = function(e) {
+    stop("Error reading experiment: ", e$message)
+  })
+  
+  # Get strategies
+  strategies <- tryCatch({
+    call_strategy(experiment)
+  }, error = function(e) {
+    warning("Error in call_strategy: ", e$message)
+    return(NULL)
+  })
+  
+  if (is.null(strategies)) {
+    message("No strategies found. Exiting.")
+    return(NULL)
+  }
+  
+  pdf_file <- file.path(output_folder, "Coh1M_all_paths.pdf")
+  
+  # Open PDF
+  pdf(file = pdf_file)
+  message("Saving plots to: ", pdf_file)
+  
+  # Ensure dev.off ALWAYS runs
+  on.exit(dev.off(), add = TRUE)
+  
+  # Plot each path
+  for (i in seq_along(experiment$metrics)) {
+    tryCatch({
+      plot_path(
+        experiment$metrics[[i]],
+        title = paste0(
+          experiment$metrics[[i]]$id,
+          " - ",
+          strategies$calls[i, "name"]
+        )
+      )
+    }, error = function(e) {
+      warning(paste("Error plotting metric", i, ":", e$message))
+    })
+  }
+  
+  message("Finished saving plots.")
+}
+
+plot_all_paths()
+
+
+
+
+# for age 5mo (day4), pool plot w/ trajectory 
+#  start w male, then females
+
+# CIPL vs prob scatterplots (MATLAB)
+# modify function to also add CIPL to plots
+
+
+
