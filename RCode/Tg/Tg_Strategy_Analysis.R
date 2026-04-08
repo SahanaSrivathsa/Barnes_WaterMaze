@@ -14,7 +14,7 @@ library(car)
 # MUST RUN ----------------------------------------------------------------
 
 # Load data
-strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_02-01-2026.xlsx')
+strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_04-04-2026.xlsx')
 all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv')
 description_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx'
 
@@ -1047,7 +1047,7 @@ plot_all_paths <- function(output_folder = "/Users/miasponseller/Desktop/Lab/Rtr
     message("Created directory: ", output_folder)
   }
   
-  desc_file <- "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc_Coh1M.xlsx"
+  desc_file <- "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx"
   data_dir <- "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks"
   
   # Read experiment
@@ -1070,14 +1070,11 @@ plot_all_paths <- function(output_folder = "/Users/miasponseller/Desktop/Lab/Rtr
     return(NULL)
   }
   
-  pdf_file <- file.path(output_folder, "Coh1M_all_paths.pdf")
+  pdf_file <- file.path(output_folder, "Tg_all_paths.pdf")
   
   # Open PDF
   pdf(file = pdf_file)
   message("Saving plots to: ", pdf_file)
-  
-  # Ensure dev.off ALWAYS runs
-  on.exit(dev.off(), add = TRUE)
   
   # Plot each path
   for (i in seq_along(experiment$metrics)) {
@@ -1108,6 +1105,7 @@ plot_all_paths()
 
 # CIPL vs prob scatterplots (MATLAB)
 # modify function to also add CIPL to plots
+
 
 
 
