@@ -3,23 +3,11 @@ library(readxl)
 library(Rtrack)
 library(dplyr)
 
-<<<<<<< Updated upstream
+
 rtrack_folder <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg' # Main directory
 all_rats_desc_fp <- file.path('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx') # all rats experiment description file, must be an .xlsx
 trials_dir <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks' # folder with all cohorts' trials path data
 strat_export_fp <- paste0("/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_", format(Sys.Date(), "%m-%d-%Y"), ".xlsx") # output file path
-=======
-rtrack_folder <- '/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Split Spatial Sheets' # Rtrack folder file path (main directory)
-all_rats_desc_fp <- file.path("/Users/miasponseller/Desktop/CAS_exp_desc.xlsx") # all rats experiment description file, must be an .xlsx
-trials_dir <- "/Users/miasponseller/Desktop/Lab/Rtrack/CAS/All CAS Tracks" # folder with all trials path data
-strat_export_fp <- paste0("/Users/miasponseller/Desktop/CAS_MWM_results_", format(Sys.Date(), "%m-%d-%Y"), ".xlsx") # output file path
-
-cohort_list <- c('1O', '1YM', '2M', '2O', '2Y', '3M', '3O', '3Y', '4M', '4O', '4Y',
-                 '5M', '5O', '5Y', '6M', '6O', '6Y', '7M', '7O', '7Y', '8M', '8O',
-                 '8Y', '9M', '9O', '10O', '10YM', '11M', '11O', '11Y', '12O', '12YM', 
-                 '13OP', '13OR', '13YM', '14BR', '14P', '14RP', '15Bk', '15BR', 
-                 '15G', '16B', '16G', '16R')
->>>>>>> Stashed changes
 
 cohort_list <- read_excel(all_rats_desc_fp) %>% 
   pull(Cohort) %>%
@@ -62,7 +50,7 @@ mwm_results <- mwm_results %>%
     `direct path` = `8`,
     perseverance = `9`
     )
-<<<<<<< Updated upstream
+
 #   
 # #pd column
 # if (!"pd" %in% colnames(mwm_results)) {
@@ -113,7 +101,6 @@ write.xlsx(mwm_results, strat_export_fp, sheetName = "Spatial", overwrite = TRUE
   
 message("\n")
 message(paste("File has been created successfully:", strat_export_fp))
-=======
   
   # pd column
   if (!"pd" %in% colnames(mwm_results)) {
@@ -166,6 +153,6 @@ message(paste("File has been created successfully:", strat_export_fp))
   
   message("\n")
   message(paste("File has been created successfully:", strat_export_fp))
-}
->>>>>>> Stashed changes
+
+
 
