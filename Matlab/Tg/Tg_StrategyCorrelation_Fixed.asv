@@ -10,13 +10,6 @@ if ~exist(fig_dir,"dir")
     mkdir(fig_dir);
 end
 
-% Create output subfolders if they don't exist yet
-subfolders = {'CIPL_Strategy', 'StrategyUse', 'Entropy', 'Platform'};
-for sf = subfolders
-    p = fullfile(fig_dir, sf{1});
-    if ~exist(p, 'dir'), mkdir(p); end
-end
-
 %Load data from Excel files
 data1 = readtable(fullfile('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_Results_NoCoh1.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
 data2 = readtable(fullfile('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/MatlabFiles/Processed/AllMorrisWaterMazeData_Spatial.csv'));  % From Matlab Analysis contains Test_No, Cohort, Platform_CIPL
@@ -50,10 +43,6 @@ data1.AgeGroup(data1.Age > ageCutYoungMid & data1.Age <= ageCutMidOld) = "Mid";
 % Ensure Sex and APP columns are string arrays for consistency
 data1.Sex = string(data1.Sex);
 data1.APP  = string(data1.APP);
-
-% SexGeno: e.g. "M_WT", "F_APP+" — slash stripped so it is safe for
-% filenames and can be used directly as a groupBy option throughout the script.
-data1.SexGeno = data1.Sex + "_" + strrep(data1.APP, '/', '');
 
 % Build a combined Group label: AgeGroup_Sex_APP  e.g. "Young_M_WT"
 % (This is used in sections that want all-combinations colour mapping)
@@ -250,10 +239,9 @@ comboTitle = @(ci, extra) sprintf('%s  (n=%d)%s', ...
 %            'Sex'       → M / F  (or whatever values are in data1.Sex)
 %            'APP'       → WT / APP/+
 %            'Group'     → all combinations (AgeGroup_Sex_APP)
-%            'SexGeno'   → all combinations (SexAPP)
 %            'Age'       → individual numeric age values (one colour each)
 % -----------------------------------------------------------------------
-groupBy_S1 = 'SexGeno';   % <-- CHANGE THIS PER ANALYSIS
+groupBy_S1 = 'AgeGroup';   % <-- CHANGE THIS PER ANALYSIS
 
 polyOrder = 2;
 
@@ -343,7 +331,7 @@ end
 % NEW: Set groupBy to choose colouring factor for this section.
 %   Same options as Section 1.
 % -----------------------------------------------------------------------
-groupBy_S2 = 'SexGeno';   % <-- CHANGE THIS PER ANALYSIS
+groupBy_S2 = 'AgeGroup';   % <-- CHANGE THIS PER ANALYSIS
 
 polyOrder = 2;
 strategyGroups = {
@@ -434,92 +422,92 @@ end
 %         close;
 %     end
 % end
-% 
-% % ---- Per individual numeric age figures for Section 2 ---- %
-% % One figure per strategy group: each unique age value is its own
-% % coloured scatter series so you can compare e.g. 5mo vs 5.5mo vs 6mo.
-% uniqueAges_S2 = unique(data1.Age);
-% nAges_S2      = numel(uniqueAges_S2);
-% if nAges_S2 <= size(baseCols,1)
-%     ageCols_S2 = num2cell(baseCols(1:nAges_S2,:), 2);
-% else
-%     c = hsv(nAges_S2); ageCols_S2 = num2cell(c, 2);
-% end
-% 
-% for s = 1:numel(groupNames)
-%     currentStrategies_age = strategyGroups{s, 1};
-%     groupProb_age = data1.(currentStrategies_age{1});
-%     for ii = 2:numel(currentStrategies_age)
-%         groupProb_age = groupProb_age + data1.(currentStrategies_age{ii});
-%     end
-% 
-%     f = figure; hold on;
-%     for ai = 1:nAges_S2
-%         age_val = uniqueAges_S2(ai);
-%         idx_age = data1.Age == age_val;
-%         nRats_age = numel(unique(data1.x_TargetID(idx_age)));
-%         scatter(platformScores(idx_age), groupProb_age(idx_age), 20, ...
-%             ageCols_S2{ai}, 'filled', 'MarkerFaceAlpha', 0.5, ...
-%             'DisplayName', sprintf('%.4g mo (n=%d)', age_val, nRats_age));
-%     end
-% 
-%     title(sprintf('%s: by Age', groupNames{s}), 'FontSize', 18, 'FontWeight', 'bold');
-%     xlabel('CIPL Score (m.s)', 'FontSize', 14, 'FontWeight', 'bold');
-%     ylabel('Probability',      'FontSize', 14, 'FontWeight', 'bold');
-%     legend('show', 'Location', 'bestoutside');
-%     xlim([0 60]); ylim([0 1]);
-%     set(gca, 'FontSize', 14, 'FontWeight', 'bold', ...
-%         'LineWidth', 1.5, 'Box', 'off', 'TickDir', 'out');
-%     hold off;
-% 
-%     saveas(f, fullfile(fig_dir, 'CIPL_Strategy', ...
-%         sprintf('CIPL_%s_byAge.png', groupNames{s})));
-%     close;
-% end
 
 % ---- Per individual numeric age figures for Section 2 ---- %
 % One figure per strategy group: each unique age value is its own
 % coloured scatter series so you can compare e.g. 5mo vs 5.5mo vs 6mo.
-% uniqueAges_S2 = unique(data1.Age);
-% nAges_S2      = numel(uniqueAges_S2);
-% if nAges_S2 <= size(baseCols,1)
-%     ageCols_S2 = num2cell(baseCols(1:nAges_S2,:), 2);
-% else
-%     c = hsv(nAges_S2); ageCols_S2 = num2cell(c, 2);
-% end
-% 
-% for s = 1:numel(groupNames)
-%     currentStrategies_age = strategyGroups{s, 1};
-%     groupProb_age = data1.(currentStrategies_age{1});
-%     for ii = 2:numel(currentStrategies_age)
-%         groupProb_age = groupProb_age + data1.(currentStrategies_age{ii});
-%     end
-% 
-%     for ai = 1:nAges_S2
-%         age_val   = uniqueAges_S2(ai);
-%         idx_age   = data1.Age == age_val;
-%         nRats_age = numel(unique(data1.x_TargetID(idx_age)));
-% 
-%         f = figure; hold on;
-%         scatter(platformScores(idx_age), groupProb_age(idx_age), 30, ...
-%             ageCols_S2{ai}, 'filled', 'MarkerFaceAlpha', 0.6);
-% 
-%         title(sprintf('%s  —  %.4g mo  (n=%d)', groupNames{s}, age_val, nRats_age), ...
-%             'FontSize', 16, 'FontWeight', 'bold');
-%         xlabel('CIPL Score (m.s)', 'FontSize', 14, 'FontWeight', 'bold');
-%         ylabel('Probability',      'FontSize', 14, 'FontWeight', 'bold');
-%         xlim([0 60]); ylim([0 1]);
-%         set(gca, 'FontSize', 14, 'FontWeight', 'bold', ...
-%             'LineWidth', 1.5, 'Box', 'off', 'TickDir', 'out');
-%         hold off;
-% 
-%         % filename: replace '.' with 'p' so e.g. 5.5mo → 5p5mo
-%         ageLabel = strrep(sprintf('%.4g', age_val), '.', 'p');
-%         saveas(f, fullfile(fig_dir, 'CIPL_Strategy', ...
-%             sprintf('CIPL_%s_%smo.png', groupNames{s}, ageLabel)));
-%         close;
-%     end
-% end
+uniqueAges_S2 = unique(data1.Age);
+nAges_S2      = numel(uniqueAges_S2);
+if nAges_S2 <= size(baseCols,1)
+    ageCols_S2 = num2cell(baseCols(1:nAges_S2,:), 2);
+else
+    c = hsv(nAges_S2); ageCols_S2 = num2cell(c, 2);
+end
+ 
+for s = 1:numel(groupNames)
+    currentStrategies_age = strategyGroups{s, 1};
+    groupProb_age = data1.(currentStrategies_age{1});
+    for ii = 2:numel(currentStrategies_age)
+        groupProb_age = groupProb_age + data1.(currentStrategies_age{ii});
+    end
+ 
+    f = figure; hold on;
+    for ai = 1:nAges_S2
+        age_val = uniqueAges_S2(ai);
+        idx_age = data1.Age == age_val;
+        nRats_age = numel(unique(data1.x_TargetID(idx_age)));
+        scatter(platformScores(idx_age), groupProb_age(idx_age), 20, ...
+            ageCols_S2{ai}, 'filled', 'MarkerFaceAlpha', 0.5, ...
+            'DisplayName', sprintf('%.4g mo (n=%d)', age_val, nRats_age));
+    end
+ 
+    title(sprintf('%s: by Age', groupNames{s}), 'FontSize', 18, 'FontWeight', 'bold');
+    xlabel('CIPL Score (m.s)', 'FontSize', 14, 'FontWeight', 'bold');
+    ylabel('Probability',      'FontSize', 14, 'FontWeight', 'bold');
+    legend('show', 'Location', 'bestoutside');
+    xlim([0 60]); ylim([0 1]);
+    set(gca, 'FontSize', 14, 'FontWeight', 'bold', ...
+        'LineWidth', 1.5, 'Box', 'off', 'TickDir', 'out');
+    hold off;
+ 
+    saveas(f, fullfile(fig_dir, 'CIPL_Strategy', ...
+        sprintf('CIPL_%s_byAge.png', groupNames{s})));
+    close;
+end
+
+% ---- Per individual numeric age figures for Section 2 ---- %
+% One figure per strategy group: each unique age value is its own
+% coloured scatter series so you can compare e.g. 5mo vs 5.5mo vs 6mo.
+uniqueAges_S2 = unique(data1.Age);
+nAges_S2      = numel(uniqueAges_S2);
+if nAges_S2 <= size(baseCols,1)
+    ageCols_S2 = num2cell(baseCols(1:nAges_S2,:), 2);
+else
+    c = hsv(nAges_S2); ageCols_S2 = num2cell(c, 2);
+end
+ 
+for s = 1:numel(groupNames)
+    currentStrategies_age = strategyGroups{s, 1};
+    groupProb_age = data1.(currentStrategies_age{1});
+    for ii = 2:numel(currentStrategies_age)
+        groupProb_age = groupProb_age + data1.(currentStrategies_age{ii});
+    end
+ 
+    for ai = 1:nAges_S2
+        age_val   = uniqueAges_S2(ai);
+        idx_age   = data1.Age == age_val;
+        nRats_age = numel(unique(data1.x_TargetID(idx_age)));
+ 
+        f = figure; hold on;
+        scatter(platformScores(idx_age), groupProb_age(idx_age), 30, ...
+            ageCols_S2{ai}, 'filled', 'MarkerFaceAlpha', 0.6);
+ 
+        title(sprintf('%s  —  %.4g mo  (n=%d)', groupNames{s}, age_val, nRats_age), ...
+            'FontSize', 16, 'FontWeight', 'bold');
+        xlabel('CIPL Score (m.s)', 'FontSize', 14, 'FontWeight', 'bold');
+        ylabel('Probability',      'FontSize', 14, 'FontWeight', 'bold');
+        xlim([0 60]); ylim([0 1]);
+        set(gca, 'FontSize', 14, 'FontWeight', 'bold', ...
+            'LineWidth', 1.5, 'Box', 'off', 'TickDir', 'out');
+        hold off;
+ 
+        % filename: replace '.' with 'p' so e.g. 5.5mo → 5p5mo
+        ageLabel = strrep(sprintf('%.4g', age_val), '.', 'p');
+        saveas(f, fullfile(fig_dir, 'CIPL_Strategy', ...
+            sprintf('CIPL_%s_%smo.png', groupNames{s}, ageLabel)));
+        close;
+    end
+end
 
 
 %% SEX + GENOTYPE 
@@ -774,7 +762,7 @@ end
 %   Note: 'Age' (numeric) is not suitable here as it would give one
 %         "group" per animal — use 'AgeGroup' instead.
 % -----------------------------------------------------------------------
-groupBy_S3 = 'SexGeno';   % <-- CHANGE THIS PER ANALYSIS
+groupBy_S3 = 'AgeGroup';   % <-- CHANGE THIS PER ANALYSIS
 
 apaTbl = table( ...
     strings(0,1) , strings(0,1) , ...
@@ -1038,7 +1026,7 @@ end
 groupBy_S4 = 'AgeGroup';   % <-- CHANGE THIS PER ANALYSIS
 
 strategyGroups = {
-    {'thigmotaxis', 'circling', 'randomPath'}, 'Platform-Independent';
+    {'thigmotaxis', 'circling', 'randomPath'}, 'Non-Goal Oriented';
     {'scanning', 'chaining'}, 'Procedural';
     {'directedSearch', 'correctedPath', 'directPath','perseverance'}, 'Allocentric'
     };
@@ -1189,7 +1177,7 @@ end
 % One figure per strategy group per combo.
 uniqueDays_c4 = unique(data1.x_Day);
 strategyGroups_c4 = {
-    {'thigmotaxis', 'circling', 'randomPath'}, 'Platform-Independent';
+    {'thigmotaxis', 'circling', 'randomPath'}, 'Non-Goal Oriented';
     {'scanning', 'chaining'}, 'Procedural';
     {'directedSearch', 'correctedPath', 'directPath','perseverance'}, 'Allocentric'
     };
@@ -1749,33 +1737,33 @@ end
 %   Each unique level of groupBy_S9 gets its own figure.
 % -----------------------------------------------------------------------
 groupBy_S9 = 'AgeGroup';   % <-- CHANGE THIS PER ANALYSIS
- 
+
 levels_S9 = unique(data1.(groupBy_S9));
 nLvls_S9  = numel(levels_S9);
- 
+
 strategyGroups = {
     {'thigmotaxis','circling','randomPath'}, 'NonGoal';
     {'scanning','chaining'},                 'Procedural';
     {'directedSearch','correctedPath','directPath','perseverance'}, 'Allocentric'
     };
 groupLabels = strategyGroups(:,2);
-groupNames9  = {'Platform-Independent','Procedural','Allocentric'};
+groupNames9  = {'Non‑Goal Oriented','Procedural','Allocentric'};
 nGroups9     = numel(groupLabels);
 uniqueDays   = unique(data1.x_Day);
- 
+
 stratColors9 = [
     0.3961, 0.2627, 0.1294;
     1.0000, 0.7020, 0.4000;
     0,      0.5020, 0
     ];
- 
+
 rats  = unique(data1.x_TargetID);
 nRats = numel(rats);
 nDays = numel(uniqueDays);
- 
+
 ratMeans = nan(nRats, nGroups9 * nDays);
 LvlCell  = cell(nRats,1);   % stores groupBy_S9 label per rat
- 
+
 for i = 1:nRats
     ridx        = strcmp(data1.x_TargetID, rats{i});
     LvlCell{i}  = data1.(groupBy_S9){find(ridx,1)};
@@ -1791,7 +1779,7 @@ for i = 1:nRats
         end
     end
 end
- 
+
 varNames9 = {'RatID','Age'};
 for g = 1:nGroups9
     for d = 1:nDays
@@ -1803,30 +1791,30 @@ ratTable9 = table(rats, LvlCell, ...
     ratMeans(:,5),  ratMeans(:,6),  ratMeans(:,7),  ratMeans(:,8), ...
     ratMeans(:,9),  ratMeans(:,10), ratMeans(:,11), ratMeans(:,12), ...
     'VariableNames', varNames9);
- 
+
 DaysVec  = repmat(uniqueDays, nGroups9, 1);
 StrVec   = repelem(groupLabels(:), nDays, 1);
 withinDesign9 = table(DaysVec, categorical(StrVec), ...
     'VariableNames', {'Day','StrategyGroup'});
 measureVars9 = ratTable9.Properties.VariableNames(3:end);
- 
+
 % Loop over each level of the chosen grouping factor (was 'young'/'old')
 for li = 1:nLvls_S9
     ag = char(levels_S9(li));
     idxAge = strcmp(ratTable9.Age, ag);
     subTbl = ratTable9(idxAge, :);
- 
+
     formula = sprintf('%s-%s ~ 1', measureVars9{1}, measureVars9{end});
     rm = fitrm(subTbl, formula, 'WithinDesign', withinDesign9);
- 
+
     anovaResults9 = ranova(rm, 'WithinModel', 'Day*StrategyGroup');
     writetable(anovaResults9, fullfile(processed_dir, sprintf('ANOVA_%s.csv', ag)));
- 
+
     postHocStrat = multcompare(rm, 'StrategyGroup', 'By', 'Day', 'ComparisonType', 'tukey-kramer');
     writetable(postHocStrat, fullfile(processed_dir, sprintf('PostHoc_Strat_%s.csv', ag)));
     postHocDay   = multcompare(rm, 'Day', 'By', 'StrategyGroup', 'ComparisonType', 'tukey-kramer');
     writetable(postHocDay,   fullfile(processed_dir, sprintf('PostHoc_Day_%s.csv', ag)));
- 
+
     meanData = zeros(nDays, nGroups9);
     semData  = zeros(nDays, nGroups9);
     dataMeansPerGroup = cell(nGroups9, nDays);
@@ -1839,7 +1827,7 @@ for li = 1:nLvls_S9
             dataMeansPerGroup{g,d} = vals;
         end
     end
- 
+
     f = figure('Position',[95,100,1100,630]);
     hold on;
     hBar = bar(uniqueDays, meanData, 'grouped', 'BarWidth', 0.8);
@@ -1850,12 +1838,12 @@ for li = 1:nLvls_S9
     drawnow;
     barCenters = nan(nDays, nGroups9);
     for g = 1:nGroups9, barCenters(:,g) = hBar(g).XEndPoints'; end
- 
+
     for g = 1:nGroups9
         errorbar(barCenters(:,g), meanData(:,g), semData(:,g), 'k', ...
             'LineStyle','none','LineWidth',1.5);
     end
- 
+
     jit = 0.08;
     for g = 1:nGroups9
         for d = 1:nDays
@@ -1865,14 +1853,14 @@ for li = 1:nLvls_S9
                 'MarkerEdgeColor','none','MarkerFaceAlpha',0.8);
         end
     end
- 
+
     % Between-strategy sigstar
     sigPairs = {}; sigP = []; sigCols = {};
     cs = multcompare(rm, 'StrategyGroup', 'By', 'Day', 'ComparisonType', 'tukey-kramer');
     for rr = 1:height(cs)
         pval = cs.pValue(rr);
         if pval < 0.05
-            dVal = double(cs.x_Day(rr));
+            dVal = cs.x_Day(rr);
             dIdx = find(uniqueDays == dVal, 1);
             lvl1 = char(cs.StrategyGroup_1(rr));
             lvl2 = char(cs.StrategyGroup_2(rr));
@@ -1892,7 +1880,7 @@ for li = 1:nLvls_S9
             set(hSig(k,2), 'Color', sigCols{k});
         end
     end
- 
+
     % Within-strategy day sigstar (unchanged from original)
     barCenters = nan(nDays, nGroups9);
     for g = 1:nGroups9, barCenters(:,g) = hBar(g).XEndPoints'; end
@@ -1900,7 +1888,7 @@ for li = 1:nLvls_S9
     darkGray = [0.2 0.2 0.2];
     cd9 = multcompare(rm, 'Day','By','StrategyGroup','ComparisonType','tukey-kramer');
     for d = 1:nDays-1
-        sel = double(cd9.x_Day_1)==uniqueDays(d) & double(cd9.x_Day_2)==uniqueDays(d+1);
+        sel = cd9.Day_1==uniqueDays(d) & cd9.Day_2==uniqueDays(d+1);
         sub = cd9(sel,:);
         pv = nan(1,nGroups9);
         for rr = 1:height(sub)
@@ -1931,26 +1919,24 @@ for li = 1:nLvls_S9
             set(hSig(k,2), 'Color', sigCols{k});
         end
     end
- 
-    title(sprintf('%s', upper(ag)), 'FontSize', 16, 'FontWeight', 'bold');
-    xlabel('Day', 'FontSize', 14, 'FontWeight', 'bold');
-    ylabel('Probability for Strategy Group', 'FontSize', 14, 'FontWeight', 'bold');
+
+    title(sprintf('%s', upper(ag)));
+    xlabel('Day'); ylabel('Probability for Strategy Group');
     xticks(uniqueDays);
+    legend(groupNames9, 'Location','northeastoutside');
     ylim([0 1.2]);
-    set(gca, 'FontSize', 14, 'FontWeight', 'bold', ...
-        'LineWidth', 1.5, 'Box', 'off', 'TickDir', 'out');
-    legend(groupNames9, 'Location', 'northeastoutside', 'FontSize', 12);
+    pubify_figure_axis_robust(16,16);
     hold off;
- 
+
     saveas(f, fullfile(fig_dir, sprintf('DayStrategyUse_%s.png', ag)));
     close(f);
 end
- 
+
 % ---- Per Sex×Age×APP combo figures for Section 9 ---- %
 % One figure per combo: all three strategy groups as grouped bars across days.
 % No stats — descriptive only, since each combo may have very few rats.
 strategyGroups_c9 = {
-    {'thigmotaxis','circling','randomPath'}, 'NonGoal',    'Platform-Independent';
+    {'thigmotaxis','circling','randomPath'}, 'NonGoal',    'Non-Goal Oriented';
     {'scanning','chaining'},                 'Procedural',  'Procedural';
     {'directedSearch','correctedPath','directPath','perseverance'}, 'Allocentric', 'Allocentric'
     };
@@ -1962,23 +1948,23 @@ stratColors_c9 = [
 nGroups_c9   = size(strategyGroups_c9, 1);
 uniqueDays_c9 = unique(data1.x_Day);
 nDays_c9      = numel(uniqueDays_c9);
- 
+
 for ci = 1:nCombos
     idx     = comboList(ci).mask;
     nRats_c = comboList(ci).n;
     rats_c  = unique(data1.x_TargetID(idx));
- 
+
     meanData_c9 = nan(nDays_c9, nGroups_c9);
     semData_c9  = nan(nDays_c9, nGroups_c9);
     ratMeans_c9 = cell(nGroups_c9, nDays_c9);  % per-rat means for scatter
- 
+
     for g = 1:nGroups_c9
         currentStrats_c9 = strategyGroups_c9{g,1};
         groupProb_c9 = data1.(currentStrats_c9{1});
         for ii = 2:numel(currentStrats_c9)
             groupProb_c9 = groupProb_c9 + data1.(currentStrats_c9{ii});
         end
- 
+
         for d = 1:nDays_c9
             dVal  = uniqueDays_c9(d);
             ratV  = nan(numel(rats_c),1);
@@ -1997,7 +1983,7 @@ for ci = 1:nCombos
             end
         end
     end
- 
+
     f_c9 = figure('Position',[95,100,1100,630]); hold on;
     hBar_c9 = bar(uniqueDays_c9, meanData_c9, 'grouped', 'BarWidth', 0.8);
     for g = 1:nGroups_c9
@@ -2025,15 +2011,16 @@ for ci = 1:nCombos
                 'MarkerEdgeColor','none', 'MarkerFaceAlpha', 0.8);
         end
     end
- 
+
     title(sprintf('%s  (n=%d)', comboList(ci).label, nRats_c));
     xlabel('Day'); ylabel('Probability for Strategy Group');
     xticks(uniqueDays_c9);
     legend({strategyGroups_c9{:,3}}, 'Location','northeastoutside');
     ylim([0 1.2]);
-    pubify_figure_axis_robust(16,16);
+    set(gca, 'FontSize', 14, 'FontWeight', 'bold', ...
+        'LineWidth', 1.5, 'Box', 'off', 'TickDir', 'out');
     hold off;
- 
+
     saveas(f_c9, fullfile(fig_dir, ...
         sprintf('DayStrategyUse_%s.png', comboList(ci).label)));
     close(f_c9);
@@ -2282,7 +2269,7 @@ strategyGroups11 = { ...
     {'scanning','chaining'},  'Procedural'; ...
     {'directedSearch','correctedPath','directPath'},  'Allocentric'};
 
-groupPrettyNames11 = {'Platform-Independent','Procedural','Allocentric'};
+groupPrettyNames11 = {'Non-Goal Oriented','Procedural','Allocentric'};
 
 stratColors11 = [
     0.850 0.325 0.098;
@@ -2432,7 +2419,7 @@ end
 % One figure per strategy subgroup per combo: individual strategies as
 % error-bar line plots across days. Descriptive only — no stats per combo.
 strategyGroups_c11 = { ...
-    {'thigmotaxis','circling','randomPath'}, 'NonGoal',   'Platform-Independent'; ...
+    {'thigmotaxis','circling','randomPath'}, 'NonGoal',   'Non-Goal Oriented'; ...
     {'scanning','chaining'},                 'Procedural', 'Procedural'; ...
     {'directedSearch','correctedPath','directPath'}, 'Allocentric', 'Allocentric'};
 
