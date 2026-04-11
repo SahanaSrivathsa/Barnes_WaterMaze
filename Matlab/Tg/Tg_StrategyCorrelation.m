@@ -20,13 +20,61 @@ for d = 1:numel(subDirs)
 end
 
 %Load data from Excel files
-data1 = readtable(fullfile('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_04-04-2026.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
+data1 = readtable(fullfile('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_Results_NoCoh1.xlsx'));  % From RTrack, contains Track_ID, Strategy, Age
 data2 = readtable(fullfile(base_dir,'AllMorrisWaterMazeData_Spatial.csv'));  % From Matlab Analysis contains Test_No, Cohort, Platform_CIPL
+
+% Age binning and group label construction
+% Bin continuous age into Young / Mid / Old
+% Cutoffs: Young = <9, Mid = 10-15, Old = 16+
+ageCutYoungMid = 9;   % upper bound for Young  (exclusive: age <= 9 → Young)
+ageCutMidOld   = 15;  % upper bound for Mid    (exclusive: age <= 15 → Mid)
+ 
+data1.AgeGroup = repmat("Old", height(data1), 1);
+data1.AgeGroup(data1.Age <= ageCutYoungMid) = "Young";
+data1.AgeGroup(data1.Age > ageCutYoungMid & data1.Age <= ageCutMidOld) = "Mid";
+ 
+% Ensure Sex and APP columns are string arrays for consistency
+data1.Sex = string(data1.Sex);
+data1.APP  = string(data1.APP);
+ 
+% Build a combined Group label: AgeGroup_Sex_APP  e.g. "Young_M_WT"
+% (This is used in sections that want all-combinations colour mapping)
+data1.Group = data1.AgeGroup + "_" + data1.Sex + "_" + data1.APP;
+
+% Derive full list of groups and assign a color to each one.
+grpList = unique(data1.Group);          % e.g. ["Mid_F_APP/+","Mid_F_WT", ...]
+nGrps   = numel(grpList);
+ 
+% Build a colour palette with nGrps distinct colours.
+% We use a perceptually-uniform base set; if there are more groups than
+% base colours the colormap will cycle through the full hsv wheel.
+baseCols = [
+    0.2196, 0.5569, 0.2353;   % green
+    0.4157, 0.1059, 0.6039;   % purple
+    0.8392, 0.1529, 0.1569;   % red
+    0.1216, 0.4706, 0.7059;   % blue
+    0.9020, 0.6235, 0.0000;   % amber
+    0.0000, 0.6275, 0.6275;   % teal
+    0.9176, 0.3176, 0.1412;   % vermilion
+    0.3373, 0.7059, 0.9137;   % sky blue
+    0.8000, 0.4745, 0.6549;   % pink
+    0.4980, 0.4980, 0.4980;   % grey
+    0.6275, 0.3216, 0.1765;   % brown
+    0.5608, 0.6902, 0.1961;   % lime
+];
+if nGrps <= size(baseCols,1)
+    clrMap = num2cell(baseCols(1:nGrps,:), 2);
+else
+    % Fall back to evenly-spaced hsv colours
+    c = hsv(nGrps);
+    clrMap = num2cell(c, 2);
+end
+ 
+% Helper: get colour for a given group label string
+getColor = @(g) clrMap{strcmp(grpList, g)};
+
 % Analysis Parameters that are constant - mostly colours for groups
-grpList = ["Young","Old"];
-clrMap  = {[0.2196,0.5569,0.2353],[0.4157,0.1059,0.6039]}; % green, purple
-% oldColor=[0.4157,0.1059,0.6039];
-% youngColor=[0.2196,0.5569,0.2353];
+
 % Define the strategy column names (adjust names if needed)
 strategyNames = {'thigmotaxis','circling','randomPath','scanning',...
     'chaining','directedSearch','correctedPath','directPath','perseverance'};
@@ -37,42 +85,42 @@ strategy_titles={'Thigmotaxis','Circling','Random Path','Scanning',...
 
 % CHECK FOR CONSISTENCY in datasets (Trial no and full values)
 
-% %--- For data1: Check that each unique x_TargetID has 24 unique trials ---
-% grp1 = varfun(@(x) numel(unique(x)), data1, 'GroupingVariables', 'x_TargetID', 'InputVariables', 'x_Trial');
-% % The new variable name created by varfun is 'Fun_x_Trial'
-% rats_to_remove = grp1.x_TargetID(grp1.Fun_x_Trial ~= 24);
-% 
-% if ~isempty(rats_to_remove)
-%     fprintf('Removing the following x_TargetID from data1 (incomplete trials):\n');
-%     disp(rats_to_remove);
-%     data1 = data1(~ismember(data1.x_TargetID, rats_to_remove), :);
-% else
-%     fprintf('All x_TargetID in data1 have 24 unique trials.\n');
-% end
-% 
-% %--- For data2: Check that each Animal has 24 unique trials ---
-% grp2 = varfun(@(x) numel(unique(x)), data2, 'GroupingVariables', 'Animal', 'InputVariables', 'Trial');
-% animals_incomplete = grp2.Animal(grp2.Fun_Trial ~= 24);
-% 
-% if ~isempty(animals_incomplete)
-%     fprintf('Removing the following Animals from data2 (incomplete trials):\n');
-%     disp(animals_incomplete);
-%     data2 = data2(~ismember(data2.Animal, animals_incomplete), :);
-% else
-%     fprintf('All Animals in data2 have 24 unique trials.\n');
-% end
-% 
-% %--- For data2: Remove Animals with any NaN in Platform_CIPL ---
-% grp_nan = varfun(@(x) any(isnan(x)), data2, 'GroupingVariables', 'Animal', 'InputVariables', 'Platform_CIPL');
-% animals_with_nan = grp_nan.Animal(grp_nan.Fun_Platform_CIPL);
-% 
-% if ~isempty(animals_with_nan)
-%     fprintf('Removing the following Animals from data2 (NaN in Platform_CIPL):\n');
-%     disp(animals_with_nan);
-%     data2 = data2(~ismember(data2.Animal, animals_with_nan), :);
-% else
-%     fprintf('No Animals with NaN in Platform_CIPL in data2.\n');
-% end
+%--- For data1: Check that each unique x_TargetID has 24 unique trials ---
+grp1 = varfun(@(x) numel(unique(x)), data1, 'GroupingVariables', 'x_TargetID', 'InputVariables', 'x_Trial');
+% The new variable name created by varfun is 'Fun_x_Trial'
+rats_to_remove = grp1.x_TargetID(grp1.Fun_x_Trial ~= 24);
+
+if ~isempty(rats_to_remove)
+    fprintf('Removing the following x_TargetID from data1 (incomplete trials):\n');
+    disp(rats_to_remove);
+    data1 = data1(~ismember(data1.x_TargetID, rats_to_remove), :);
+else
+    fprintf('All x_TargetID in data1 have 24 unique trials.\n');
+end
+
+%--- For data2: Check that each Animal has 24 unique trials ---
+grp2 = varfun(@(x) numel(unique(x)), data2, 'GroupingVariables', 'Animal', 'InputVariables', 'Trial');
+animals_incomplete = grp2.Animal(grp2.Fun_Trial ~= 24);
+
+if ~isempty(animals_incomplete)
+    fprintf('Removing the following Animals from data2 (incomplete trials):\n');
+    disp(animals_incomplete);
+    data2 = data2(~ismember(data2.Animal, animals_incomplete), :);
+else
+    fprintf('All Animals in data2 have 24 unique trials.\n');
+end
+
+%--- For data2: Remove Animals with any NaN in Platform_CIPL ---
+grp_nan = varfun(@(x) any(isnan(x)), data2, 'GroupingVariables', 'Animal', 'InputVariables', 'Platform_CIPL');
+animals_with_nan = grp_nan.Animal(grp_nan.Fun_Platform_CIPL);
+
+if ~isempty(animals_with_nan)
+    fprintf('Removing the following Animals from data2 (NaN in Platform_CIPL):\n');
+    disp(animals_with_nan);
+    data2 = data2(~ismember(data2.Animal, animals_with_nan), :);
+else
+    fprintf('No Animals with NaN in Platform_CIPL in data2.\n');
+end
 
 %--- Synchronize data1 and data2: Keep only animals that exist in both datasets ---
 commonAnimals = intersect(unique(data1.x_TargetID), unique(string(data2.Animal)));
@@ -138,21 +186,27 @@ for s = 1:nStrategies
     % Extract the probability vector for the current strategy
     stratProb = data1.(strategyNames{s});
 
-    % Separate indices for young and old groups
-    isYoung = strcmp(data1.APP, 'APP/+');
-    isOld   = strcmp(data1.APP, 'WT');
+    % Separate indices genotype and sex groups
+    APP_M = (strcmp(data1.APP, 'APP/+')& strcmp(data1.Sex, 'M')) ;
+    APP_F = (strcmp(data1.APP, 'APP/+')& strcmp(data1.Sex, 'F')) ;
+    WT_M  = (strcmp(data1.APP, 'WT')& strcmp(data1.Sex, 'M')) ;
+    WT_F  = (strcmp(data1.APP, 'WT')& strcmp(data1.Sex, 'F')) ;
 
     % All data (for scatter)
-    x_young = platformScores(isYoung);
-    y_young = stratProb(isYoung);
-    x_old   = platformScores(isOld);
-    y_old   = stratProb(isOld);
+    x_APP_M = platformScores(APP_M);
+    y_APP_M = stratProb(APP_M);
+    x_WT_M  = platformScores(WT_M);
+    y_WT_M   = stratProb(WT_M);
+    x_APP_F = platformScores(APP_F);
+    y_APP_F = stratProb(APP_F);
+    x_WT_F = platformScores(WT_F);
+    y_WT_F = stratProb(WT_F);
 
     % Filter out non-positive x values for polynomial fitting only
-    x_young_fit = x_young(x_young > 0);
-    y_young_fit = y_young(x_young > 0);
-    x_old_fit   = x_old(x_old > 0);
-    y_old_fit   = y_old(x_old > 0);
+    x_young_fit = x_APP_M(x_APP_M > 0);
+    y_young_fit = y_APP_M(x_APP_M > 0);
+    x_old_fit   = x_WT_M(x_WT_M > 0);
+    y_old_fit   = y_WT_M(x_WT_M > 0);
 
     f = figure; hold on;
 
@@ -211,54 +265,54 @@ for s = 1:numel(groupNames)
     stratProb = groupProb;
 
     % Separate indices for young and old groups based on the Age column
-    isYoung = strcmp(data1.Age, 'young');
-    isOld = strcmp(data1.Age, 'old');
+    APP_M = strcmp(data1.Age, 'young');
+    WT_M = strcmp(data1.Age, 'old');
 
     % Get data for each
-    x_young = platformScores(isYoung);
-    y_young = stratProb(isYoung);
-    n_young = numel(x_young);
+    x_APP_M = platformScores(APP_M);
+    y_APP_M = stratProb(APP_M);
+    n_young = numel(x_APP_M);
 
     % Data for old
-    x_old = platformScores(isOld);
-    y_old = stratProb(isOld);
-    n_old = numel(x_old);
+    x_WT_M = platformScores(WT_M);
+    y_WT_M = stratProb(WT_M);
+    n_old = numel(x_WT_M);
 
     f=figure;
     hold on;
 
     % Scatter plot (only scatter handles used in the legend)
-    scatter(x_young, y_young, 20, clrMap{1}, 'filled',...
+    scatter(x_APP_M, y_APP_M, 20, clrMap{1}, 'filled',...
         'MarkerFaceAlpha',0.5, 'DisplayName', 'YOUNG');
-    scatter(x_old, y_old, 20, clrMap{2}, 'filled',...
+    scatter(x_WT_M, y_WT_M, 20, clrMap{2}, 'filled',...
         'MarkerFaceAlpha',0.5, 'DisplayName', 'OLD');
 
     %  % NEW FIT
     % % Fit a polynomial of specified order
-    %  p_young = polyfit(x_young, y_young, polyOrder);
+    %  p_young = polyfit(x_APP_M, y_APP_M, polyOrder);
     %  % Generate fitted curve
-    %  xFit_y = linspace(min(x_young), max(x_young), 100);
+    %  xFit_y = linspace(min(x_APP_M), max(x_APP_M), 100);
     %  yFit_y = polyval(p_young, xFit_y);
     %  h1 =plot(xFit_y, yFit_y, 'Color', clrMap{1}, 'LineWidth', 2,'DisplayName','YOUNG');
     %
     %  % Compute R^2 for the young fit
-    %  yHat_young = polyval(p_young, x_young);
-    %  SSE_y = sum((y_young - yHat_young).^2);
-    %  SST_y = sum((y_young - mean(y_young)).^2);
+    %  yHat_young = polyval(p_young, x_APP_M);
+    %  SSE_y = sum((y_APP_M - yHat_young).^2);
+    %  SST_y = sum((y_APP_M - mean(y_APP_M)).^2);
     %  R2_young = 1 - SSE_y / SST_y;
     %  r_young = sqrt(max(R2_young, 0));  % effective correlation from r^2
     %
     %  %Old fit
-    %  p_old = polyfit(x_old, y_old, polyOrder);
+    %  p_old = polyfit(x_WT_M, y_WT_M, polyOrder);
     %  % Generate fitted curve
-    %  xFit_o = linspace(min(x_old), max(x_old), 100);
+    %  xFit_o = linspace(min(x_WT_M), max(x_WT_M), 100);
     %  yFit_o = polyval(p_old, xFit_o);
     %  h2 =plot(xFit_o, yFit_o, 'Color', clrMap{2}, 'LineWidth', 3,'DisplayName','OLD');
     %
     %  % Compute r^2 for the old fit
-    %  yHat_old = polyval(p_old, x_old);
-    %  SSE_o = sum((y_old - yHat_old).^2);
-    %  SST_o = sum((y_old - mean(y_old)).^2);
+    %  yHat_old = polyval(p_old, x_WT_M);
+    %  SSE_o = sum((y_WT_M - yHat_old).^2);
+    %  SST_o = sum((y_WT_M - mean(y_WT_M)).^2);
     %  R2_old = 1 - SSE_o / SST_o;
     %  r_old = sqrt(max(R2_old, 0));
     %
@@ -302,8 +356,8 @@ for s = 1:nStrategies
     %-------------- Individual Rat Plot --------------%
     stratProb = data1.(strategyNames{s});
     % Get idx for young and old groups based on the age
-    isYoung = strcmp(data1.Age, 'young');
-    isOld   = strcmp(data1.Age, 'old');
+    APP_M = strcmp(data1.Age, 'young');
+    WT_M   = strcmp(data1.Age, 'old');
 
     % Unique rats and days
     uniqueDays = unique(data1.x_Day);
@@ -325,7 +379,7 @@ for s = 1:nStrategies
         isCurrentRat = strcmp(data1.x_TargetID, ratID);
 
         % Determine if the rat is young or old and choose color
-        if ismember(ratID, data1.x_TargetID(isYoung))
+        if ismember(ratID, data1.x_TargetID(APP_M))
             ageGroup = 'young';
             color = clrMap{1};
         else
@@ -459,14 +513,14 @@ for s = 1:nStrategies
 
     %-------------- Overall Bar Plot with Mean, SEM, and Significance Markers --------------%
     % Compute means and SEM for young and old per day
-    meanYoung = arrayfun(@(d) mean(stratProb(isYoung & (data1.x_Day == d))), uniqueDays);
-    semYoung  = arrayfun(@(d) std(stratProb(isYoung & (data1.x_Day == d))) / sqrt(sum(isYoung & (data1.x_Day == d))), uniqueDays);
-    meanOld   = arrayfun(@(d) mean(stratProb(isOld & (data1.x_Day == d))), uniqueDays);
-    semOld    = arrayfun(@(d) std(stratProb(isOld & (data1.x_Day == d))) / sqrt(sum(isOld & (data1.x_Day == d))), uniqueDays);
+    meanYoung = arrayfun(@(d) mean(stratProb(APP_M & (data1.x_Day == d))), uniqueDays);
+    semYoung  = arrayfun(@(d) std(stratProb(APP_M & (data1.x_Day == d))) / sqrt(sum(APP_M & (data1.x_Day == d))), uniqueDays);
+    meanOld   = arrayfun(@(d) mean(stratProb(WT_M & (data1.x_Day == d))), uniqueDays);
+    semOld    = arrayfun(@(d) std(stratProb(WT_M & (data1.x_Day == d))) / sqrt(sum(WT_M & (data1.x_Day == d))), uniqueDays);
 
     % Extract individual data points for jitter plotting (cell arrays, one cell per day)
-    dataYoung = arrayfun(@(d) stratProb(isYoung & (data1.x_Day == d)), uniqueDays, 'UniformOutput', false);
-    dataOld   = arrayfun(@(d) stratProb(isOld & (data1.x_Day == d)), uniqueDays, 'UniformOutput', false);
+    dataYoung = arrayfun(@(d) stratProb(APP_M & (data1.x_Day == d)), uniqueDays, 'UniformOutput', false);
+    dataOld   = arrayfun(@(d) stratProb(WT_M & (data1.x_Day == d)), uniqueDays, 'UniformOutput', false);
 
     % % Create bar plot using the separate function plot_bar_sem
     % f2 = figure;
@@ -552,8 +606,8 @@ for g = 1:nGroups
     groupStrat{g}=groupProb;
 
     % Get idx for young and old groups based on the age
-    isYoung = strcmp(data1.Age, 'young');
-    isOld   = strcmp(data1.Age, 'old');
+    APP_M = strcmp(data1.Age, 'young');
+    WT_M   = strcmp(data1.Age, 'old');
 
     % Initialize cell array to save mean strategy use per rat
     mean_strat = {};
@@ -652,14 +706,14 @@ for g = 1:nGroups
     %-------------- Overall Bar Plot with Mean, SEM, and Significance Markers --------------%
 
     % Compute means and SEM for young and old per day using all trials
-    meanYoung = arrayfun(@(d) mean(groupProb(isYoung & (data1.x_Day == d))), uniqueDays);
-    semYoung  = arrayfun(@(d) std(groupProb(isYoung & (data1.x_Day == d))) / sqrt(sum(isYoung & (data1.x_Day == d))), uniqueDays);
-    meanOld   = arrayfun(@(d) mean(groupProb(isOld & (data1.x_Day == d))), uniqueDays);
-    semOld    = arrayfun(@(d) std(groupProb(isOld & (data1.x_Day == d))) / sqrt(sum(isOld & (data1.x_Day == d))), uniqueDays);
+    meanYoung = arrayfun(@(d) mean(groupProb(APP_M & (data1.x_Day == d))), uniqueDays);
+    semYoung  = arrayfun(@(d) std(groupProb(APP_M & (data1.x_Day == d))) / sqrt(sum(APP_M & (data1.x_Day == d))), uniqueDays);
+    meanOld   = arrayfun(@(d) mean(groupProb(WT_M & (data1.x_Day == d))), uniqueDays);
+    semOld    = arrayfun(@(d) std(groupProb(WT_M & (data1.x_Day == d))) / sqrt(sum(WT_M & (data1.x_Day == d))), uniqueDays);
 
     % Extract individual data points for jitter plotting (cell arrays, one cell per day)
-    dataYoung = arrayfun(@(d) groupProb(isYoung & (data1.x_Day == d)), uniqueDays, 'UniformOutput', false);
-    dataOld   = arrayfun(@(d) groupProb(isOld & (data1.x_Day == d)), uniqueDays, 'UniformOutput', false);
+    dataYoung = arrayfun(@(d) groupProb(APP_M & (data1.x_Day == d)), uniqueDays, 'UniformOutput', false);
+    dataOld   = arrayfun(@(d) groupProb(WT_M & (data1.x_Day == d)), uniqueDays, 'UniformOutput', false);
 
     % % Create bar plot using the separate function plot_bar_sem
     % f2 = figure;
