@@ -1100,12 +1100,4 @@ plot_all_paths()
 
 
 
-# for age 5mo (day4), pool plot w/ trajectory 
-#  start w male, then females
-
-# CIPL vs prob scatterplots (MATLAB)
-# modify function to also add CIPL to plots
-
-
-
 

@@ -16,7 +16,7 @@ library(car)
 # Load data
 strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_Results_NoCoh1.xlsx')
 all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv')
-description_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx'
+description_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc_noCoh1.xlsx'
 
 strat_sheet$Age = as.numeric(strat_sheet$Age)
 

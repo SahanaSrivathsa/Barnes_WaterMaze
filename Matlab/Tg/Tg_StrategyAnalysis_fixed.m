@@ -163,7 +163,7 @@ for i = 1:numel(files)
     end
 
     fprintf('\nCohort %s added: %d Spatial rows | Age NaN: %d | Sex filled: %d | APP filled: %d', ...
-        cohortNum, height(spT), ...
+        cohortStr, height(spT), ...
         sum(isnan(spT.Age)), ...
         sum(spT.Sex ~= ""), ...
         sum(spT.APP ~= ""));
@@ -197,22 +197,144 @@ T.Group = repmat("Old", height(T), 1);
 T.Group(T.Age < 15) = "Young";
 T.Day = floor((T.Trial-1)/6) + 1;
 
-%% First Trial Comparison
-first_cipl = T.Platform_CIPL(T.Trial==1);
-first_age  = T.Group(T.Trial==1);
-youngData  = first_cipl(first_age=='Young');
-oldData    = first_cipl(first_age=='Old');
+%% First Trial Comparison — Sex x Genotype Groups
+first_cipl = T.Platform_CIPL(T.Trial == 1);
+first_sex  = T.Sex(T.Trial == 1);
+first_app  = T.APP(T.Trial == 1);
+
+% Define groups
+groups = {"M","WT"; "M","APP/+"; "F","WT"; "F","APP/+"};
+labels = {'Male-WT','Male-APP/+','Female-WT','Female-APP/+'};
+colors = [0.1216, 0.4706, 0.7059;   % blue   - Male-WT
+          0.8392, 0.1529, 0.1569;   % red    - Male-APP
+          0.4157, 0.1059, 0.6039;  % purple   - Female-WT
+          0.2196, 0.5569, 0.2353]; % green - Female-APP
+
+groupData = cell(4,1);
+for g = 1:4
+    mask = strcmpi(first_sex, groups{g,1}) & strcmpi(first_app, groups{g,2});
+    groupData{g} = first_cipl(mask);
+    fprintf('Group %s: n=%d\n', labels{g}, sum(mask));
+end
 
 figure;
-boxchart(ones(size(youngData)), youngData, 'BoxFaceColor',[0 0.6 0], 'LineWidth',1.5);
 hold on
-boxchart(2*ones(size(oldData)), oldData, 'BoxFaceColor',[0.5 0 0.5], 'LineWidth',1.5);
-[~, p] = ttest2(youngData, oldData, 'Vartype','unequal');
-fprintf('\nThe P value for the first trial is %f\n', p);
-title('First Trial CIPL Performance')
-xticks([1 2])
+for g = 1:4
+    boxchart(g * ones(size(groupData{g})), groupData{g}, ...
+        'BoxFaceColor', colors(g,:), 'MarkerColor', colors(g,:), 'LineWidth', 3);
+end
+
+% Pairwise t-tests (WT vs APP within each sex)
+[~, p_male]   = ttest2(groupData{1}, groupData{2}, 'Vartype','unequal');
+[~, p_female] = ttest2(groupData{3}, groupData{4}, 'Vartype','unequal');
+fprintf('\nMale   WT vs APP: p = %f\n', p_male);
+fprintf('Female WT vs APP: p = %f\n', p_female);
+
+title('CIPL Score on First Trial')
+xticks(1:4)
+xticklabels(labels)
+ylabel('Platform CIPL')
+set(gca,'FontSize',18,'FontWeight','bold','LineWidth',3,'Box','off','TickDir','out');
+
+%% Repeated Measures ANOVA — Sex x Genotype x Day (mean CIPL per animal per day)
+
+% --- Step 1: Compute per-animal daily mean CIPL ---
+T.SexGeno = strcat(T.Sex, "-", T.APP);   % e.g. "M-WT", "F-APP/+"
+
+animals   = unique(T.Animal);
+days      = unique(T.Day);
+nAnimals  = numel(animals);
+nDays     = numel(days);
+
+% Pre-allocate summary table
+animalMeans = table();
+animalMeans.Animal  = animals;
+animalMeans.SexGeno = repmat("", nAnimals, 1);
+
+dayMatrix = nan(nAnimals, nDays);   % rows = animals, cols = days
+
+for a = 1:nAnimals
+    idx = T.Animal == animals(a);
+    animalMeans.SexGeno(a) = unique(T.SexGeno(idx));   % should be one value per animal
+
+    for d = 1:nDays
+        trialIdx = idx & T.Day == days(d);
+        if any(trialIdx)
+            dayMatrix(a, d) = mean(T.Platform_CIPL(trialIdx), 'omitnan');
+        end
+    end
+end
+
+% Attach day columns to the summary table
+for d = 1:nDays
+    animalMeans.(sprintf('Day%d', days(d))) = dayMatrix(:, d);
+end
+
+fprintf('\n=== Animals per group ===\n');
+grps = unique(animalMeans.SexGeno);
+for g = 1:numel(grps)
+    fprintf('  %s: n=%d\n', grps(g), sum(animalMeans.SexGeno == grps(g)));
+end
+
+% --- Step 2: Remove animals with any missing day (rm-ANOVA requires complete cases) ---
+completeCases = all(~isnan(dayMatrix), 2);
+fprintf('\n%d animals removed due to missing days\n', sum(~completeCases));
+animalMeans  = animalMeans(completeCases, :);
+dayMatrix    = dayMatrix(completeCases, :);
+
+% --- Step 3: Run repeated measures ANOVA ---
+dayVarNames = arrayfun(@(d) sprintf('Day%d', d), days, 'UniformOutput', false);
+withinTable = table(days, 'VariableNames', {'Day'});
+
+rm = fitrm(animalMeans, ...
+    sprintf('%s-%s ~ SexGeno', dayVarNames{1}, dayVarNames{end}), ...
+    'WithinDesign', withinTable);
+
+fprintf('\n=== Repeated Measures ANOVA ===\n');
+ranovatbl = ranova(rm, 'WithinModel', 'Day');
+disp(ranovatbl)
+
+fprintf('\n=== Between-subjects effect (SexGeno) ===\n');
+disp(rm.Coefficients)
+
+% --- Step 4: Mauchly's test for sphericity ---
+fprintf('\n=== Mauchly''s Test for Sphericity ===\n');
+disp(mauchly(rm))
+
+% --- Step 5: Plot group means +/- SEM across days ---
+groupList  = {"M-WT","M-APP/+","F-WT","F-APP/+"};
+plotLabels = {'Male-WT','Male-APP/+','Female-WT','Female-APP/+'};
+colors     = [0.2 0.4 0.8; 0.1 0.6 0.9; 0.85 0.3 0.5; 0.6 0.0 0.4];
+
+figure; hold on;
+for g = 1:4
+    idx  = animalMeans.SexGeno == groupList{g};
+    vals = dayMatrix(idx, :);
+    m    = mean(vals, 1, 'omitnan');
+    sem  = std(vals, 0, 1, 'omitnan') ./ sqrt(sum(idx));
+
+    errorbar(days, m, sem, '-o', ...
+        'Color', colors(g,:), 'MarkerFaceColor', colors(g,:), ...
+        'LineWidth', 1.8, 'MarkerSize', 6, 'DisplayName', plotLabels{g});
+end
+
+xlabel('Day'); ylabel('Mean Platform CIPL');
+title('Spatial Learning — Sex x Genotype x Day');
+legend('Location','best');
+xticks(days);
 set(gca,'FontSize',14,'FontWeight','bold','LineWidth',1.5,'Box','off','TickDir','out');
-xticklabels({'Young','Old'})
+
+%% Pairwise Welch's t-tests — all group combinations
+groupPairs = nchoosek(1:4, 2);  % all 6 pairwise combinations
+
+fprintf('\n=== Pairwise Welch''s t-tests (First Trial CIPL) ===\n');
+for i = 1:size(groupPairs, 1)
+    g1 = groupPairs(i,1);
+    g2 = groupPairs(i,2);
+    [~, p, ~, stats] = ttest2(groupData{g1}, groupData{g2}, 'Vartype','unequal');
+    fprintf('%s vs %s:  t(%0.1f) = %.3f,  p = %.4f\n', ...
+        labels{g1}, labels{g2}, stats.df, stats.tstat, p);
+end
 
 %% Rest of code
 varList = {'Platform_CIPL','Duration','Distance','PathEfficiency'};

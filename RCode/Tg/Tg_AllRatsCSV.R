@@ -25,6 +25,7 @@ output_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial.cs
 
 # List all .xlsx files in the folder
 spatial_files <- list.files(spatial_sheets_folder, pattern = '\\.xlsx$', full.names = TRUE)
+print(spatial_files)
 
 # Empty list to store dataframes
 all_data <- list()
