@@ -11,244 +11,308 @@ library(ggpubr)
 library(rstatix)
 library(car)
 
-# MUST RUN ----------------------------------------------------------------
-
+# MUST RUN 
 # Load data
-strat_sheet <- read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_04-04-2026.xlsx')
-all_rats_spatial <- read.csv('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv')
-description_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx'
+strat_sheet <- read_excel("D:/NARP_Data/RTrack_NARPMale/Tg_MWM_results_06-07-2026.xlsx")
+all_rats_spatial <- read.csv("D:/NARP_Data/RTrack_NARPMale/Tg_AllRats_Spatial.csv")
+description_file <- "D:/NARP_Data/RTrack_NARPMale/Tg_exp_desc.xlsx"
 
-strat_sheet$Age = as.numeric(strat_sheet$Age)
+# If your file uses Genotype instead of APP, standardize it here
+if (!"APP" %in% colnames(strat_sheet) && "Genotype" %in% colnames(strat_sheet)) {
+  strat_sheet <- strat_sheet %>% rename(APP = Genotype)
+}
 
-# Add if running Rtrack plots
-all_trials <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks'
+strat_sheet$Age <- as.numeric(strat_sheet$Age)
 
-# Fix floating-point precision issue for Age column
-# strat_sheet$Age <- as.numeric(strat_sheet$Age)
-# strat_sheet$Age <- round(strat_sheet$Age, 1)
+# Rtrack trial folder on your Windows machine
+all_trials <- "D:/NARP_Data/RTrack_NARPMale/All_Tracks"
 
 # Figures Folder
-fig_folder = '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Figures'
+fig_folder <- "D:/NARP_Data/RTrack_NARPMale/Figures"
 dir.create(fig_folder, recursive = TRUE, showWarnings = FALSE)
 
-sex_counts <- strat_sheet %>% 
-  group_by(Sex) %>% 
-  summarize(UniqueCount = n_distinct(`_TargetID`))
-
-n_male = sex_counts$n[sex_counts$Sex == 'M']
-n_female = sex_counts$n[sex_counts$Sex == 'F']
-
 # Strategy categories
-platform_independent <- c('thigmotaxis', 'circling', 'random path')
-procedural <- c('scanning', 'chaining')
-allocentric <- c('directed search', 'corrected path', 'direct path')
+platform_independent <- c("thigmotaxis", "circling", "random path")
+procedural <- c("scanning", "chaining")
+allocentric <- c("directed search", "corrected path", "direct path")
 
-list_of_strats = c('direct path', 'corrected path', 'directed search', 'chaining', 
-                   'scanning', 'random path', 'circling', 'thigmotaxis')
+list_of_strats <- c(
+  "direct path", "corrected path", "directed search", "chaining", 
+  "scanning", "random path", "circling", "thigmotaxis"
+)
 
-list_of_strat_cats = c('Allocentric', 'Procedural', 'PlatformIndependent')
+list_of_strat_cats <- c("Allocentric", "Procedural", "PlatformIndependent")
 
-# Add StratCat, AgeCat, AgeGroup, and Group columns
+# Age bins
+age_cats <- c(
+  "4mo", "5mo", "6mo", "7mo", "8mo", "9mo",
+  "10mo", "11mo", "12-13mo",
+  "15-16mo", "20-21mo"
+)
+## FOR ONLY RUNNING MALES ETC
+sexes <- strat_sheet %>%
+  filter(!is.na(Sex)) %>%
+  distinct(Sex) %>%
+  pull(Sex) %>%
+  sort()
+
+sex_age_groups <- as.vector(outer(sexes, age_cats, paste, sep = "-"))
+sex_age_groups <- as.vector(outer(sexes, age_cats, paste, sep = "-"))
+
+# Add StratCat, AgeCat, AgeCenter, AgeGroup, and Group columns
 strat_sheet <- strat_sheet %>% 
   mutate(
     StratCat = case_when(
-      name %in% platform_independent ~ 'PlatformIndependent',
-      name %in% procedural ~ 'Procedural',
-      name %in% allocentric ~ 'Allocentric'
-    )) %>% 
-  mutate(
+      name %in% platform_independent ~ "PlatformIndependent",
+      name %in% procedural ~ "Procedural",
+      name %in% allocentric ~ "Allocentric",
+      TRUE ~ NA_character_
+    ),
     AgeCat = case_when(
-      Age < 7  ~ '5',
-      Age >= 7 & Age < 10 ~ '8', 
-      Age >= 10 & Age < 13 ~ '11',
-      Age >= 13 & Age < 15 ~ '13.5',
-      Age>= 15 & Age < 16 ~ '15.5',
-      Age >= 20 ~ '20'
-    )) %>% 
-  mutate(Group = paste0(Sex, '-', APP)) %>% 
-  mutate(
+      Age >= 3.5  & Age < 4.5  ~ "4mo",
+      Age >= 4.5  & Age < 5.5  ~ "5mo",
+      Age >= 5.5  & Age < 6.5  ~ "6mo",
+      Age >= 6.5  & Age < 7.5  ~ "7mo",
+      Age >= 7.5  & Age < 8.5  ~ "8mo",
+      Age >= 8.5  & Age < 9.5  ~ "9mo",
+      Age >= 9.5  & Age < 10.5 ~ "10mo",
+      Age >= 10.5 & Age < 11.5 ~ "11mo",
+      Age >= 11.5 & Age < 14.5 ~ "12-13mo",
+      Age >= 14.5 & Age < 17.5 ~ "15-16mo",
+      Age >= 17.5 & Age < 22.5 ~ "20-21mo",
+      TRUE ~ NA_character_
+    ),
+    AgeCenter = case_when(
+      Age >= 3.5  & Age < 4.5  ~ 4,
+      Age >= 4.5  & Age < 5.5  ~ 5,
+      Age >= 5.5  & Age < 6.5  ~ 6,
+      Age >= 6.5  & Age < 7.5  ~ 7,
+      Age >= 7.5  & Age < 8.5  ~ 8,
+      Age >= 8.5  & Age < 9.5  ~ 9,
+      Age >= 9.5  & Age < 10.5 ~ 10,
+      Age >= 10.5 & Age < 11.5 ~ 11,
+      Age >= 11.5 & Age < 14.5 ~ 12,
+      Age >= 14.5 & Age < 17.5 ~ 16,
+      Age >= 17.5 & Age < 22.5 ~ 20,
+      TRUE ~ NA_real_
+    ),
     AgeGroup = case_when(
-      Age < 9 ~ 'Young',
-      Age >= 9 & Age < 15 ~ 'Middle',
-      Age >= 15 ~ 'Old'
-    )
+      Age < 9 ~ "Young",
+      Age >= 9 & Age < 15 ~ "Middle",
+      Age >= 15 ~ "Old",
+      TRUE ~ NA_character_
+    ),
+    Group = paste0(Sex, "-", APP)
   )
 
-# StratCat levels
+# Factor order
 strat_sheet$StratCat <- factor(
-  strat_sheet$StratCat, levels = c('PlatformIndependent', 'Procedural', 'Allocentric')
+  strat_sheet$StratCat,
+  levels = c("PlatformIndependent", "Procedural", "Allocentric")
 )
 
-# Group levels
-group_levels <- c(
-  "F-5", "M-5",
-  "F-8", "M-8",
-  "F-11", "M-11",
-  "F-13.5", "M-13.5",
-  "F-15.5", "M-15.5",
-  "F-20", "M-20"
-)
+strat_sheet$AgeCat <- factor(strat_sheet$AgeCat, levels = age_cats)
+strat_sheet$AgeGroup <- factor(strat_sheet$AgeGroup, levels = c("Young", "Middle", "Old"))
 
-age_cats <- c("5", "8", "11", "13.5", "15.5", "20")
-sexes <- c("F", "M")
-sex_age_groups <- as.vector(outer(sexes, age_cats, paste, sep = "-"))
+# Group levels for Sex-AgeCat plots
+group_levels <- sex_age_groups
 
-# Add Allocentric, Procedural, and PlatformIndependent columns with avg prob for trial
-strat_sheet$PlatformIndependentProb <- rowSums(strat_sheet[,platform_independent])
-strat_sheet$ProceduralProb <- rowSums(strat_sheet[,procedural])
-strat_sheet$AllocentricProb <- rowSums(strat_sheet[,allocentric])
+# Add Allocentric, Procedural, and PlatformIndependent probability columns
+strat_sheet$PlatformIndependentProb <- rowSums(strat_sheet[, platform_independent], na.rm = TRUE)
+strat_sheet$ProceduralProb <- rowSums(strat_sheet[, procedural], na.rm = TRUE)
+strat_sheet$AllocentricProb <- rowSums(strat_sheet[, allocentric], na.rm = TRUE)
 
-# colors
+# Colors
 strat_colors <- c(
-  'direct path' = '#2B6519',
-  'corrected path' = '#5F972B',
-  'directed search' = '#A3CA3F',
-  'chaining' = '#FCF050',
-  'scanning' = '#F7D148',
-  'random path' = '#F3B341',
-  'circling' = '#AE7A38',
-  'thigmotaxis' = '#69403F'
+  "direct path" = "#2B6519",
+  "corrected path" = "#5F972B",
+  "directed search" = "#A3CA3F",
+  "chaining" = "#FCF050",
+  "scanning" = "#F7D148",
+  "random path" = "#F3B341",
+  "circling" = "#AE7A38",
+  "thigmotaxis" = "#69403F"
 )
 
 strat_cat_colors <- c(
-  'Allocentric' = '#1b7837',
-  'Procedural' = '#ffd700',
-  'PlatformIndependent' = '#654321'
+  "Allocentric" = "#1b7837",
+  "Procedural" = "#ffd700",
+  "PlatformIndependent" = "#654321"
 )
 
-sex_age_colors <- c(
-  "F-5"     = "#e6194b",
-  "M-5"     = "#f58231",
-  "F-8"     = "#3cb44b",
-  "M-8"     = "#0082c8",
-  "F-11"    = "#911eb4",
-  "M-11"    = "#46f0f0",
-  "F-15.5"  = "#000075",
-  "M-15.5"  = "#f032e6",
-  "F-20"    = "#bfef45",
-  "M-20"    = "#7f7fff"
+base_age_colors <- c(
+  "4mo" = "#e6194b",
+  "5mo" = "#f58231",
+  "6mo" = "#3cb44b",
+  "7mo" = "#0082c8",
+  "8mo" = "#911eb4",
+  "9mo" = "#46f0f0",
+  "10mo" = "#f032e6",
+  "11mo" = "#bcf60c",
+  "12mo"="#008080",
+  "15-16mo" = "#000075",
+  "20-21mo" = "#7f7fff"
 )
 
+sex_age_colors <- setNames(
+  rep(base_age_colors[age_cats], times = length(sexes)),
+  sex_age_groups
+)
 
-# Counts ------------------------------------------------------------------
-
+# Counts ------------
 sex_counts <- strat_sheet %>% 
   group_by(Sex) %>% 
-  summarize(n_animals = n_distinct(`_TargetID`), .groups = 'drop')
+  summarize(n_animals = n_distinct(`_TargetID`), .groups = "drop")
 print(sex_counts)
 
+n_male <- sex_counts$n_animals[sex_counts$Sex == "M"]
+n_female <- sex_counts$n_animals[sex_counts$Sex == "F"]
+
 age_counts <- strat_sheet %>% 
-  group_by(Age) %>% 
-  summarize(n_animals = n_distinct(`_TargetID`))
+  group_by(AgeCat, AgeCenter, AgeGroup) %>% 
+  summarize(n_animals = n_distinct(`_TargetID`), .groups = "drop") %>%
+  arrange(AgeCenter)
 print(age_counts)
+
+agegroup_counts <- strat_sheet %>% 
+  group_by(AgeGroup) %>% 
+  summarize(n_animals = n_distinct(`_TargetID`), .groups = "drop")
+print(agegroup_counts)
 
 group_counts <- strat_sheet %>% 
   group_by(Group) %>% 
-  summarize(n_animals = n_distinct(`_TargetID`), .groups = 'drop')
+  summarize(n_animals = n_distinct(`_TargetID`), .groups = "drop")
 print(group_counts)
 
-# Group summary, cols Group, n_animals, and one for each AgeCat
+# Group summary by AgeCat
 group_summary <- strat_sheet %>%
   distinct(Group, AgeCat, `_TargetID`) %>%
   count(Group, AgeCat) %>%
   pivot_wider(names_from = AgeCat, values_from = n, values_fill = 0) %>%
   mutate(n_animals = rowSums(across(-Group))) %>%
-  relocate(Group, n_animals, '5', '8', '11', '15.5', '20')
+  relocate(Group, n_animals, any_of(age_cats))
 
 totals_row <- group_summary %>%
   summarise(across(where(is.numeric), sum)) %>%
   mutate(Group = "TOTAL") %>%
   relocate(Group)
+
 final_summary <- bind_rows(group_summary, totals_row)
 print(final_summary)
+###################################################################################
+# Rtrack Strategy Plots -----
+# Rtrack Strategy Plots -----
 
-# Rtrack Strategy Plots ---------------------------------------------------
+rtrack_fig_folder <- file.path(fig_folder, "RTrack_StrategyPlots")
+dir.create(rtrack_fig_folder, recursive = TRUE, showWarnings = FALSE)
 
 r_track_strat_plots <- function() {
-  bulk_strategy_calling <- function() {
-    experiment_file <- description_file
-    
-    experiment <<- Rtrack::read_experiment(experiment_file, data.dir = all_trials)
-    strategies <<- Rtrack::call_strategy(experiment)
-    list(experiment = experiment, strategies = strategies)
-  }
   
-  if (!exists("experiment", envir = .GlobalEnv) || !exists("strategies", envir = .GlobalEnv)) {
-    bulk_strategy_calling()
-  }
+  desc <- readxl::read_excel(description_file)
   
-  par(cex.lab = 1.4,   # Adjust axis label size
-      cex.axis = 1.3,  # Adjust tick mark labels
-      cex.main = 1.6,  # Main title size
-      cex.sub = 1.2)   # Subtitle size
+  desc <- desc %>%
+    filter(
+      !is.na(Sex),
+      !is.na(Genotype),
+      !is.na(Age),
+      !is.na(`_Trial`),
+      !is.na(`_Day`)
+    )
   
-  # Strategy plot, across all rats
-  Rtrack::plot_strategies(strategies, experiment = experiment)
+  clean_description_file <- file.path(
+    dirname(description_file),
+    "Tg_exp_desc_no_NA_rats.xlsx"
+  )
   
-  # Strategy plots, by Cohort
-  #Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Cohort")
+  writexl::write_xlsx(desc, clean_description_file)
   
-  # Strategy plots, by Age
-  Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Genotype")
+  experiment <<- Rtrack::read_experiment(
+    clean_description_file,
+    data.dir = all_trials
+  )
   
-  print("Plots successfully created")
-}
-bulk_strategy_calling <- function() {
-  experiment_file <- description_file
-  
-  experiment <<- Rtrack::read_experiment(experiment_file, data.dir = all_trials)
   strategies <<- Rtrack::call_strategy(experiment)
-  list(experiment = experiment, strategies = strategies)
+  
+  # All rats plot
+  jpeg(
+    filename = file.path(rtrack_fig_folder, "RTrack_Strategies_AllRats_NoNA.jpeg"),
+    width = 10,
+    height = 7,
+    units = "in",
+    res = 300
+  )
+  par(cex.lab = 1.4, cex.axis = 1.3, cex.main = 1.6, cex.sub = 1.2)
+  Rtrack::plot_strategies(strategies, experiment = experiment)
+  dev.off()
+  
+  # Genotype plot
+  jpeg(
+    filename = file.path(rtrack_fig_folder, "RTrack_Strategies_ByGenotype.jpeg"),
+    width = 10,
+    height = 7,
+    units = "in",
+    res = 300
+  )
+  par(cex.lab = 1.4, cex.axis = 1.3, cex.main = 1.6, cex.sub = 1.2)
+  Rtrack::plot_strategies(strategies, experiment = experiment, factor = "Genotype")
+  dev.off()
+  
+  message("Rtrack strategy plots saved to: ", rtrack_fig_folder)
 }
-
-r_track_strat_plots()
-
+##############################################################################################
 # Strategy Use Proportions by Rat -----------------------------------------
 
 strategy_proportions_graphs <- function() {
-  # List of unique groups
   groups <- unique(strat_sheet$Group)
+  groups <- groups[!is.na(groups)]
   
-  # Loop through groups and generate plots for each
   for (g in groups) {
     group_data <- strat_sheet %>% 
       filter(Group == g) %>% 
       group_by(`_Day`, name) %>% 
-      summarize(count = n(), .groups = 'drop') %>% 
+      summarize(count = n(), .groups = "drop") %>% 
       group_by(`_Day`) %>% 
-      mutate(prop = count/sum(count)) %>% 
+      mutate(prop = count / sum(count)) %>% 
       ungroup()
     
-    plt <- ggplot(group_data, aes(x = factor(`_Day`), y = prop, 
-                                  fill = factor(name, levels = list_of_strats))) +
-      geom_bar(stat = 'identity', position = 'stack') +
+    plt <- ggplot(
+      group_data,
+      aes(
+        x = factor(`_Day`),
+        y = prop,
+        fill = factor(name, levels = list_of_strats)
+      )
+    ) +
+      geom_bar(stat = "identity", position = "stack") +
       scale_fill_manual(values = strat_colors) + 
-      scale_y_continuous() +
+      scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
       labs(
-        title = paste('Dominant Strategy Usage by Day:', g),
-        x = 'Day', y = 'Proportion of Trials',
-        fill = 'Strategy'
+        title = paste("Dominant Strategy Usage by Day:", g),
+        x = "Day",
+        y = "Proportion of Trials",
+        fill = "Strategy"
       ) + 
       theme_minimal(base_size = 14) +
       theme(
-        axis.title = element_text(size = 16, face = 'bold'),
-        axis.text = element_text(size = 14, face = 'bold'),
-        plot.title = element_text(size = 18, face = 'bold', hjust = .5),
+        axis.title = element_text(size = 16, face = "bold"),
+        axis.text = element_text(size = 14, face = "bold"),
+        plot.title = element_text(size = 18, face = "bold", hjust = .5),
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12)
       )
     
-    # Save plot to Figures folder
-    # safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
-    # file_path <- file.path(fig_folder, paste0("Dominant_Strategy_PropOfTrials", safe_g, ".jpeg"))
-    # ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
+    safe_g <- gsub("[^A-Za-z0-9_]", "_", g)
+    file_path <- file.path(
+      rtrack_fig_folder,
+      paste0("Dominant_Strategy_PropOfTrials_", safe_g, ".jpeg")
+    )
+    
+    ggsave(file_path, plt, width = 8, height = 6, dpi = 300)
     
     print(plt)
   }
 }
-
-strategy_proportions_graphs()
-
+##################################################################################
 # Prob Strat Cat Sex/Genotype ---------------------------------------------
 
 sex_genotype <- function() {
@@ -578,20 +642,21 @@ plot_strategy_lines <- function(data, sex_filter = NULL, title_prefix = "", save
 # All groups
 plot_strategy_lines(group_day_summary2, sex_filter = NULL, title_prefix = "All_", save_folder = fig_folder)
 
-# Females only
-plot_strategy_lines(group_day_summary2, sex_filter = "F", title_prefix = "Female_", save_folder = fig_folder)
+if ("F" %in% strat_sheet$Sex) {
+  plot_strategy_lines(group_day_summary2, sex_filter = "F", title_prefix = "Female_", save_folder = fig_folder)
+}
 
-# Males only
-plot_strategy_lines(group_day_summary2, sex_filter = "M", title_prefix = "Male_", save_folder = fig_folder)
-
+if ("M" %in% strat_sheet$Sex) {
+  plot_strategy_lines(group_day_summary2, sex_filter = "M", title_prefix = "Male_", save_folder = fig_folder)
+}
 
 
 # Across Days Allocentric Line Plots --------------------------------------
 
 # Allocentric strategies to long
 allocentric_long <- strat_sheet %>%
-  select(Group, `_Day`, Sex, APP, AgeCat, all_of(allocentric)) %>%
-  pivot_longer(cols = all_of(allocentric), 
+  select(Group, `_Day`, Sex, APP, AgeCat, any_of(allocentric)) %>%
+  pivot_longer(cols = any_of(allocentric), 
                names_to = "Strategy", 
                values_to = "Probability")
 
@@ -669,13 +734,13 @@ plot_allocentric_strategies <- function(data, sex_filter = NULL, title_prefix = 
 # All groups
 plot_allocentric_strategies(allocentric_summary, sex_filter = NULL, title_prefix = "All_", save_folder = fig_folder)
 
-# Females only
-plot_allocentric_strategies(allocentric_summary, sex_filter = "F", title_prefix = "Female_", save_folder = fig_folder)
+if ("F" %in% strat_sheet$Sex) {
+  plot_allocentric_strategies(allocentric_summary, sex_filter = "F", title_prefix = "Female_", save_folder = fig_folder)
+}
 
-# Males only
-plot_allocentric_strategies(allocentric_summary, sex_filter = "M", title_prefix = "Male_", save_folder = fig_folder)
-
-
+if ("M" %in% strat_sheet$Sex) {
+  plot_allocentric_strategies(allocentric_summary, sex_filter = "M", title_prefix = "Male_", save_folder = fig_folder)
+}
 
 
 
@@ -686,8 +751,8 @@ plot_allocentric_strategies(allocentric_summary, sex_filter = "M", title_prefix 
 
 # Procedural strategies to long
 procedural_long <- strat_sheet %>%
-  select(Group, `_Day`, Sex, APP, AgeCat, all_of(procedural)) %>%
-  pivot_longer(cols = all_of(procedural), 
+  select(Group, `_Day`, Sex, APP, AgeCat, any_of(procedural)) %>%
+  pivot_longer(cols = any_of(procedural), 
                names_to = "Strategy", 
                values_to = "Probability")
 
@@ -765,12 +830,13 @@ plot_procedural_strategies <- function(data, sex_filter = NULL, title_prefix = "
 # All groups
 plot_procedural_strategies(procedural_summary, sex_filter = NULL, title_prefix = "All_", save_folder = fig_folder)
 
-# Females only
-plot_procedural_strategies(procedural_summary, sex_filter = "F", title_prefix = "Female_", save_folder = fig_folder)
+if ("F" %in% strat_sheet$Sex) {
+  plot_procedural_strategies(procedural_summary, sex_filter = "F", title_prefix = "Female_", save_folder = fig_folder)
+}
 
-# Males only
-plot_procedural_strategies(procedural_summary, sex_filter = "M", title_prefix = "Male_", save_folder = fig_folder)
-
+if ("M" %in% strat_sheet$Sex) {
+  plot_procedural_strategies(procedural_summary, sex_filter = "M", title_prefix = "Male_", save_folder = fig_folder)
+}
 
 # ANOVA: Sex x AgeGroup x Genotype (excluding old) ------------------------
 
@@ -834,13 +900,17 @@ sex_agegroup_genotype_anova <- function() {
   message('ANOVA results saved to: ', fp)
 }
 
-sex_agegroup_genotype_anova()
+if (n_distinct(na.omit(strat_sheet$Sex)) > 1) {
+  sex_agegroup_genotype_anova()
+} else {
+  message("Skipping Sex x AgeGroup x Genotype ANOVA: only one sex present.")
+}
 
 
 # ANOVA: AgeGroup x Genotype ----------------------------------------------
 
 agegroup_genotype_anova <- function() {
-  fp <- "/Users/miasponseller/Desktop/Lab/Rtrack/tg_anova_no_sex.txt"
+  fp <- all_trials <- "D:/NARP_Data/RTrack_NARPMale/tg_anova_no_sex.txt"
   
   sink(fp)
   
@@ -995,7 +1065,7 @@ ggplot(procedural_prob_day4,
     y = "Mean Probability",
     color = "Sex / Genotype"
   ) +
-  theme_() +
+  theme_minimal() +
   scale_y_continuous(limits = c(0, 1))
 
 # Day 4 mean AllocentricProb by Age / Sex / APP -------------------
@@ -1028,18 +1098,19 @@ ggplot(allocentric_prob_day4,
   theme_minimal() +
   scale_y_continuous(limits = c(0, 1))
 
+#########################################
+# UNCOMMENT IF NEEDED
+### Single Trial Plot ------------------------
 
-# Single Trial Plot -------------------------------------------------------
+#arena_single = Rtrack::read_arena("D:/NARP_Data/RTrack_NARPMale/Arena Files/Cohort1MArena.txt")
+#path_single = Rtrack::read_path('D:/NARP_Data/RTrack_NARPMale/Tg/All_Tracks/Coh1M_Trial205.csv', arena_single, id = 'test205', track.format = 'anymaze.csv')
+#metrics_single = Rtrack::calculate_metrics(path_single, arena_single)
+#Rtrack::plot_path(metrics_single)
+#########################################
 
-arena_single = Rtrack::read_arena('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Arena Files/Cohort1MArena.txt')
-path_single = Rtrack::read_path('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks/Coh1M_Trial205.csv', arena_single, id = 'test205', track.format = 'anymaze.csv')
-metrics_single = Rtrack::calculate_metrics(path_single, arena_single)
-Rtrack::plot_path(metrics_single)
+# Plot All Paths (Save as PDF) ---------------
 
-
-# Plot All Paths (Save as PDF) --------------------------------------------
-
-plot_all_paths <- function(output_folder = "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Plot_PDFs") {
+plot_all_paths <- function(output_folder = "D:/NARP_Data/RTrack_NARPMale/Plot_PDFs") {
   
   # Create output folder if it doesn't exist
   if (!dir.exists(output_folder)) {
@@ -1047,8 +1118,8 @@ plot_all_paths <- function(output_folder = "/Users/miasponseller/Desktop/Lab/Rtr
     message("Created directory: ", output_folder)
   }
   
-  desc_file <- "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx"
-  data_dir <- "/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks"
+  desc_file <- "D:/NARP_Data/RTrack_NARPMale/Tg_exp_desc.xlsx"
+  data_dir <- "D:/NARP_Data/RTrack_NARPMale/All_Tracks"
   
   # Read experiment
   experiment <- tryCatch({

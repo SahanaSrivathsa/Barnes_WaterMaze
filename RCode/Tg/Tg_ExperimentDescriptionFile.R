@@ -3,8 +3,8 @@ library(dplyr)
 library(writexl)
 
 # Load CSV file (From AllRatsCSV.R)
-input_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial_cleaned.csv'
-output_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx'
+input_file <- "D:/NARP_Data/RTrack_NARPMale/Tg_AllRats_Spatial.csv"
+output_file <- "D:/NARP_Data/RTrack_NARPMale/Tg_exp_desc.xlsx"
 
 
 df <- read_csv(input_file)
@@ -18,7 +18,7 @@ df <- df %>%
     `_Day` = pmin(((Trial - 1) %/% 6 + 1), 4),
     `_TrackFileFormat` = 'anymaze.csv',
     `_Arena` = paste0('Arena Files/Cohort', Cohort, 'Arena.txt'),
-    `_TrackFile` = paste0('Coh', Cohort, '_Trial', Test, '.csv')
+    `_TrackFile` = paste0('Cohort', Cohort, '/Coh', Cohort, '_Trial', Test, '.csv')
   )
 
 expected_trials <- 1:24
@@ -38,7 +38,7 @@ filtered_df <- df %>% filter(`_TargetID` %in% valid_animals)
 # Select output columns
 output_columns <- c(
   '_TrackID', '_TargetID', '_Trial', '_Day', '_TrackFileFormat', 'Sex', 'Cohort', 
-  '_Arena', '_TrackFile', 'APP', 'Age'
+  '_Arena', '_TrackFile', 'Genotype', 'Age'
 )
 
 output_df <- filtered_df %>% select(all_of(output_columns))

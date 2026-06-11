@@ -10,8 +10,8 @@ library(tidyr)
 # not necessary, but can include for Key: Sex, treatment type
 # Spatial columns: Test, Animal, Trial
 # not necessary, but can include for Spatial: Duration, Distance, Mean speed, Path efficiency, CIPL
-spatial_sheets_folder <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Spatial Sheets'
-output_file <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_AllRats_Spatial.csv'
+spatial_sheets_folder <- "D:/NARP_Data/RTrack_NARPMale/Spatial_Sheets"
+output_file <- "D:/NARP_Data/RTrack_NARPMale/Tg_AllRats_Spatial.csv"
 
 # CAS ONLY - Performance sheets and ID performance dictionaries
 # young = read_excel('/Users/miasponseller/Desktop/Lab/Rtrack/CAS/Performance Sheets/2023-01-18_Rats_New_age_6.xlsx')

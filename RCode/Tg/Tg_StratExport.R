@@ -4,18 +4,44 @@ library(Rtrack)
 library(dplyr)
 
 
-rtrack_folder <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg' # Main directory
-all_rats_desc_fp <- file.path('/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_exp_desc.xlsx') # all rats experiment description file, must be an .xlsx
-trials_dir <- '/Users/miasponseller/Desktop/Lab/Rtrack/Tg/All Tg Tracks' # folder with all cohorts' trials path data
-strat_export_fp <- paste0("/Users/miasponseller/Desktop/Lab/Rtrack/Tg/Tg_MWM_results_", format(Sys.Date(), "%m-%d-%Y"), ".xlsx") # output file path
+rtrack_folder <- "D:/NARP_Data/RTrack_NARPMale" # Main directory
+setwd(rtrack_folder)
+all_rats_desc_fp <- "Tg_exp_desc.xlsx"
+trials_dir <- "All_Tracks"
 
+strat_export_fp <- paste0(
+  rtrack_folder,
+  "/Tg_MWM_results_",
+  format(Sys.Date(), "%m-%d-%Y"),
+  ".xlsx"
+)
 cohort_list <- read_excel(all_rats_desc_fp) %>% 
   pull(Cohort) %>%
   unique() %>% 
   sort()
+desc <- read_excel(all_rats_desc_fp)
+## REad files for arena and call bulk
+arena_paths <- file.path(rtrack_folder, desc$`_Arena`)
+track_paths <- file.path(rtrack_folder, trials_dir, desc$`_TrackFile`)
+missing_arenas <- unique(arena_paths[!file.exists(arena_paths)])
+missing_tracks <- unique(track_paths[!file.exists(track_paths)])
 
+if (length(missing_arenas) > 0) {
+  cat("Missing arena files:\n")
+  cat(paste(missing_arenas, collapse = "\n"))
+  stop("\nFix missing arena files before running Rtrack.")
+}
+
+if (length(missing_tracks) > 0) {
+  cat("Missing track files:\n")
+  cat(paste(missing_tracks, collapse = "\n"))
+  stop("\nFix missing track files before running Rtrack.")
+}
 bulk_strategy_calling <- function() {
-  experiment <<- Rtrack::read_experiment(all_rats_desc_fp, data.dir = trials_dir)
+  experiment <<- Rtrack::read_experiment(
+    all_rats_desc_fp,
+    data.dir = trials_dir
+  )
   strategies <<- Rtrack::call_strategy(experiment)
   list(experiment = experiment, strategies = strategies)
 }
